@@ -33,6 +33,17 @@
 
 ;; ── HTML → Org conversion ─────────────────────────────────────────────────────
 
+(defun chrome-server-chatgpt--strip-svg (html)
+  "Remove all <svg>...</svg> elements from HTML string."
+  (with-temp-buffer
+    (insert html)
+    (goto-char (point-min))
+    (while (re-search-forward "<svg[[:space:]\n][^>]*>" nil t)
+      (let ((start (match-beginning 0)))
+        (when (re-search-forward "</svg>" nil t)
+          (delete-region start (point)))))
+    (buffer-string)))
+
 (defun chrome-server-chatgpt--html-to-org (html media-dir)
   "Convert HTML string to org format via pandoc.
 Images are extracted to MEDIA-DIR via pandoc's --extract-media flag.
@@ -40,7 +51,7 @@ Signals an error if pandoc is not found or exits non-zero."
   (unless (executable-find chrome-server-pandoc-executable)
     (error "chrome-server-chatgpt: pandoc not found (set chrome-server-pandoc-executable)"))
   (with-temp-buffer
-    (let ((exit-code (call-process-region html nil
+    (let ((exit-code (call-process-region (chrome-server-chatgpt--strip-svg html) nil
                                           chrome-server-pandoc-executable
                                           nil t nil
                                           "-f" "html" "-t" "org"
@@ -78,8 +89,10 @@ Signals an error if pandoc is not found or exits non-zero."
 ;; ── Conversation saving ───────────────────────────────────────────────────────
 
 (defun chrome-server-chatgpt--id (url)
-  "Extract the conversation ID from a ChatGPT URL, or nil if not found."
-  (when (string-match "chatgpt\\.com/c/\\([^/?#]+\\)" url)
+  "Extract the conversation ID from a ChatGPT URL, or nil if not found.
+Handles both direct conversations (chatgpt.com/c/<id>) and project
+conversations (chatgpt.com/g/<project>/c/<id>)."
+  (when (string-match "chatgpt\\.com/\\(?:g/[^/?#]+/\\)?c/\\([^/?#]+\\)" url)
     (match-string 1 url)))
 
 (defun chrome-server-chatgpt--sanitize-title (title)
