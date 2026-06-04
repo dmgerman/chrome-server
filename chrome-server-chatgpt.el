@@ -44,18 +44,36 @@
           (delete-region start (point)))))
     (buffer-string)))
 
+(defun chrome-server-chatgpt--min-heading-level (html)
+  "Return the smallest HTML heading level (1-6) found in HTML, or nil if none."
+  (let ((case-fold-search t))
+    (with-temp-buffer
+      (insert html)
+      (goto-char (point-min))
+      (let ((min-level nil))
+        (while (re-search-forward "<h\\([1-6]\\)\\b" nil t)
+          (let ((lvl (string-to-number (match-string 1))))
+            (when (or (null min-level) (< lvl min-level))
+              (setq min-level lvl))))
+        min-level))))
+
 (defun chrome-server-chatgpt--html-to-org (html media-dir)
   "Convert HTML string to org format via pandoc.
 Images are extracted to MEDIA-DIR via pandoc's --extract-media flag.
+Headings are shifted so the topmost heading in HTML becomes org level 3,
+keeping pandoc output nested under the surrounding level-2 turn heading.
 Signals an error if pandoc is not found or exits non-zero."
   (unless (executable-find chrome-server-pandoc-executable)
     (error "chrome-server-chatgpt: pandoc not found (set chrome-server-pandoc-executable)"))
   (with-temp-buffer
-    (let ((exit-code (call-process-region (chrome-server-chatgpt--strip-svg html) nil
+    (let* ((min-lvl (chrome-server-chatgpt--min-heading-level html))
+           (shift   (if min-lvl (- 3 min-lvl) 0))
+           (exit-code (call-process-region (chrome-server-chatgpt--strip-svg html) nil
                                           chrome-server-pandoc-executable
                                           nil t nil
                                           "-f" "html" "-t" "org"
                                           "--wrap=none"
+                                          (format "--shift-heading-level-by=%d" shift)
                                           (format "--extract-media=%s" media-dir))))
       (unless (zerop exit-code)
         (error "chrome-server-chatgpt: pandoc failed (exit %d): %s"
