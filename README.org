@@ -327,6 +327,20 @@ none of its external dependencies are needed.
 
 ** Emacs
 
+The elisp files are intended for distribution through MELPA (recipe
+in the =melpa/= subdirectory of this repository).  Once accepted,
+=M-x package-install RET chrome-server RET= will install the core
+=chrome-server.el= along with =chrome-server-www=,
+=chrome-server-chatgpt=, =chrome-server-youtube=, and
+=chrome-server-babel=.  Until then, clone the repository and point
+=:load-path= at it.
+
+The Chrome extension under =extension/= is not distributed through
+MELPA; it must be loaded into Chrome separately (see *Chrome
+extension* below).  Installing only the elisp side will start the
+WebSocket server but the popup status will remain Disconnected until
+the extension is loaded.
+
 One =use-package= form for the core, with one =require= per optional
 feature; comment out any you do not want loaded:
 
@@ -334,7 +348,8 @@ feature; comment out any you do not want loaded:
 (use-package websocket :ensure t)
 
 (use-package chrome-server
-  :load-path "/path/to/chrome-server"
+  ;; :ensure t after the MELPA recipe is accepted; until then
+  ;; :load-path "/path/to/chrome-server"
   :after websocket
   :config
   (require 'chrome-server-www)      ; SAVE_PAGE        (web archive)

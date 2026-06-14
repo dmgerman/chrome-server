@@ -1,0 +1,4 @@
+(chrome-server
+ :fetcher github
+ :repo "dmgerman/chrome-server"
+ :files ("chrome-server*.el"))

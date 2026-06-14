@@ -19,7 +19,9 @@
       "Bash(python3 -c \"import PIL; print\\('PIL ok:', PIL.__version__\\)\")",
       "Bash(python3 -c \"from PIL import Image; print\\('PIL ok'\\)\")",
       "Bash(python3 scripts/make-red-icons.py)",
-      "Bash(pngpaste doc/popup.png)"
+      "Bash(pngpaste doc/popup.png)",
+      "Bash(emacs --batch -Q --eval '\\(checkdoc-file \"__TRACKED_VAR__\"\\)')",
+      "Bash(python3 *)"
     ]
   }
 }

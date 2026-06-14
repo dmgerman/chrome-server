@@ -4,8 +4,10 @@
 
 ;; Author: Daniel M. German <dmg@turingmachine.org>
 ;; Maintainer: Daniel M. German <dmg@turingmachine.org>
-;; Keywords: browser, websocket, org, youtube, transcript
-;; Homepage: https://github.com/dmgerman
+;; Version: 0.5
+;; Keywords: comm, tools, browser, org, multimedia
+;; URL: https://github.com/dmgerman/chrome-server
+;; Package-Requires: ((emacs "27.1") (chrome-server "0.5"))
 
 ;; SPDX-License-Identifier: GPL-3.0-or-later
 ;;
@@ -100,14 +102,14 @@ Obtain one at https://console.cloud.google.com/ and set this variable.")
 Returns the first item hash-table, or signals an error."
   (let ((video-id (chrome-server-youtube--video-id url)))
     (unless video-id
-      (error "chrome-server-youtube: could not extract video ID from: %s" url))
+      (error "Could not extract video ID from: %s" url))
     (unless chrome-server-youtube-api-key
-      (error "chrome-server-youtube: chrome-server-youtube-api-key is not set"))
+      (error "Chrome-server-youtube-api-key is not set"))
     (let* ((api-url (format "https://www.googleapis.com/youtube/v3/videos?part=snippet,contentDetails,statistics&id=%s&key=%s"
                             video-id chrome-server-youtube-api-key))
            (coding-system-for-read 'binary)
            (buf (url-retrieve-synchronously api-url t t)))
-      (unless buf (error "chrome-server-youtube: failed to retrieve YouTube info"))
+      (unless buf (error "Failed to retrieve YouTube info"))
       (unwind-protect
           (with-current-buffer buf
             (goto-char (point-min))
@@ -167,6 +169,7 @@ Returns empty string if DURATION is nil or empty."
 
 (defun chrome-server-youtube--build-entry (url title selection oembed api-info video-id)
   "Build and return an org capture entry string for a YouTube video.
+URL, TITLE, SELECTION, and VIDEO-ID identify and seed the entry.
 OEMBED and API-INFO may be nil if the respective fetch failed."
   (let* ((title       (if (and (string= title url) oembed (gethash "title" oembed))
                           (gethash "title" oembed) title))
@@ -205,7 +208,8 @@ OEMBED and API-INFO may be nil if the respective fetch failed."
 ;; ── YOUTUBE handler ───────────────────────────────────────────────────────────
 
 (defun chrome-server-youtube--handle-youtube (payload)
-  "Handle YOUTUBE request.  Respond-fast-then-defer."
+  "Handle YOUTUBE request with PAYLOAD.
+Schedules the capture and returns immediately (respond-fast-then-defer)."
   (chrome-server--require-payload payload)
   (chrome-server-defer #'chrome-server-youtube--capture payload)
   (chrome-server--ok "Video capture started"))
@@ -217,7 +221,7 @@ OEMBED and API-INFO may be nil if the respective fetch failed."
             (title (or (plist-get payload :title) ""))
             (text  (or (plist-get payload :text) "")))
         (unless url
-          (error "chrome-server-youtube: missing url in payload"))
+          (error "Missing url in payload"))
         (chrome-server--maybe-raise payload)
         (chrome-server-youtube--video-for-later url title text))
     (error
@@ -237,7 +241,11 @@ OEMBED and API-INFO may be nil if the respective fetch failed."
 
 (defun chrome-server-youtube--video-for-later (url title selection)
   "Capture YouTube video URL into `chrome-server-youtube-videos-file'.
-Fetches metadata from oEmbed and the YouTube Data API, then runs org-capture."
+URL is the watch URL.  TITLE is the user-supplied title (falls back to
+the oEmbed title if URL was sent in its place).  SELECTION is text
+quoted from the page, if any.
+Fetches metadata from oEmbed and the YouTube Data API, then runs
+`org-capture'."
   (let* ((video-id   (chrome-server-youtube--video-id url))
          (api-info   (condition-case err
                          (chrome-server-youtube--fetch-api-info url)
@@ -266,10 +274,12 @@ Fetches metadata from oEmbed and the YouTube Data API, then runs org-capture."
 ;; ── YOUTUBE_TRANSCRIPT handler ────────────────────────────────────────────────
 
 (defun chrome-server-youtube--handle-transcript (payload)
-  "Handle YOUTUBE_TRANSCRIPT request.  Respond-fast-then-defer."
+  "Handle YOUTUBE_TRANSCRIPT request with PAYLOAD.
+Schedules the transcript fetch and returns immediately
+\(respond-fast-then-defer)."
   (chrome-server--require-payload payload)
   (unless (plist-get payload :url)
-    (error "chrome-server-youtube: missing url in payload"))
+    (error "Missing url in payload"))
   (chrome-server-defer #'chrome-server-youtube--transcript-download-and-save payload)
   (chrome-server--ok "Transcript download started"))
 
@@ -278,13 +288,13 @@ Fetches metadata from oEmbed and the YouTube Data API, then runs org-capture."
 (defun chrome-server-youtube--transcript-get-info (url)
   "Run yt-dlp -J URL and return parsed JSON hash-table."
   (unless (executable-find chrome-server-youtube-transcript-yt-dlp-executable)
-    (error "chrome-server-youtube: yt-dlp not found (set chrome-server-youtube-transcript-yt-dlp-executable)"))
+    (error "Yt-dlp not found (set chrome-server-youtube-transcript-yt-dlp-executable)"))
   (let ((default-directory (expand-file-name "~/")))
     (with-temp-buffer
       (let ((exit-code (call-process chrome-server-youtube-transcript-yt-dlp-executable
                                      nil t nil "-J" "--no-playlist" url)))
         (unless (zerop exit-code)
-          (error "chrome-server-youtube: yt-dlp -J failed (exit %d)" exit-code))
+          (error "Yt-dlp -J failed (exit %d)" exit-code))
         (goto-char (point-min))
         (let ((json-object-type 'hash-table)
               (json-array-type  'list)
@@ -307,6 +317,7 @@ Returns nil if nothing is found."
 
 (defun chrome-server-youtube--transcript-download-vtt (url lang conv-dir video-id)
   "Download VTT subtitles for URL in LANG into CONV-DIR.
+VIDEO-ID is used as the output filename stem.
 Returns the path of the downloaded VTT file, or nil if not found."
   (let ((default-directory conv-dir))
     (with-temp-buffer
@@ -324,7 +335,7 @@ Returns the path of the downloaded VTT file, or nil if not found."
 ;; ── VTT → Org conversion ─────────────────────────────────────────────────────
 
 (defun chrome-server-youtube--transcript-vtt-time-to-seconds (ts)
-  "Convert VTT timestamp HH:MM:SS.mmm to total seconds (integer)."
+  "Convert VTT timestamp TS (form HH:MM:SS.mmm) to total seconds (integer)."
   (if (string-match "\\([0-9]+\\):\\([0-9]+\\):\\([0-9]+\\)" ts)
       (+ (* (string-to-number (match-string 1 ts)) 3600)
          (* (string-to-number (match-string 2 ts)) 60)
@@ -332,7 +343,7 @@ Returns the path of the downloaded VTT file, or nil if not found."
     0))
 
 (defun chrome-server-youtube--transcript-format-timestamp (ts)
-  "Format VTT timestamp HH:MM:SS.mmm as H:MM:SS for display."
+  "Format VTT timestamp TS (form HH:MM:SS.mmm) as H:MM:SS for display."
   (if (string-match "\\([0-9]+\\):\\([0-9]+\\):\\([0-9]+\\)" ts)
       (let ((h (string-to-number (match-string 1 ts)))
             (m (match-string 2 ts))
@@ -436,7 +447,10 @@ Returns nil when no matching directory is found."
     conv-dir))
 
 (defun chrome-server-youtube--transcript-write-stub (payload info lang)
-  "Write a stub org file noting no transcript was available."
+  "Write a stub org file noting no transcript was available.
+PAYLOAD supplies the URL and title; INFO is the parsed yt-dlp metadata
+hash-table (or nil if the call failed); LANG is the requested language
+code that turned out to have no captions."
   (condition-case err
       (let* ((url        (plist-get payload :url))
              (title      (or (plist-get payload :title)
@@ -449,7 +463,7 @@ Returns nil when no matching directory is found."
              (conv-dir   (chrome-server-youtube--transcript-make-dir payload info))
              (basename   (file-name-nondirectory conv-dir))
              (file       (expand-file-name (concat basename ".org") conv-dir)))
-        (message "chrome-server-youtube: no subs for lang=%s; manual=%S auto=%S"
+        (message "No subs for lang=%s; manual=%S auto=%S"
                  lang avail-man avail-auto)
         (with-temp-file file
           (insert (format "#+title: %s\n" title))
@@ -477,7 +491,7 @@ If no transcript is available, writes a stub org file and logs to *Messages*."
         (if (not eff-lang)
             (progn
               (chrome-server-youtube--transcript-write-stub payload info lang)
-              (message "chrome-server-youtube: no transcript for %s (lang: %s)" url lang))
+              (message "No transcript for %s (lang: %s)" url lang))
           (let* ((video-id (or (chrome-server-youtube--video-id url) "unknown"))
                  (title    (or (and info (gethash "title" info)) title))
                  (conv-dir (chrome-server-youtube--transcript-make-dir payload info))
@@ -519,7 +533,7 @@ If no transcript is available, writes a stub org file and logs to *Messages*."
                 (insert (chrome-server-youtube--transcript-vtt-to-org vtt-content url))
                 (insert "\n")))
             (chrome-server--maybe-raise payload)
-            (message "chrome-server-youtube: transcript saved to %s" org-file))))
+            (message "Transcript saved to %s" org-file))))
     (error
      (chrome-server--warn "transcript failed: %s" (error-message-string err)))))
 
@@ -529,6 +543,5 @@ If no transcript is available, writes a stub org file and logs to *Messages*."
 (chrome-server-register-handler "YOUTUBE_TRANSCRIPT"  #'chrome-server-youtube--handle-transcript)
 
 (provide 'chrome-server-youtube)
-(provide 'chrome-server-youtube-transcript)
 
 ;;; chrome-server-youtube.el ends here

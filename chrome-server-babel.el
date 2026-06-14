@@ -4,8 +4,10 @@
 
 ;; Author: Daniel M. German <dmg@turingmachine.org>
 ;; Maintainer: Daniel M. German <dmg@turingmachine.org>
-;; Keywords: browser, websocket, org, babel, javascript
-;; Homepage: https://github.com/dmgerman
+;; Version: 0.5
+;; Keywords: comm, tools, browser, org, languages
+;; URL: https://github.com/dmgerman/chrome-server
+;; Package-Requires: ((emacs "27.1") (chrome-server "0.5") (org "9.4"))
 
 ;; SPDX-License-Identifier: GPL-3.0-or-later
 ;;
@@ -55,9 +57,14 @@
 ;; Forward-declare so we don't pull in the whole babel runtime at load time.
 (declare-function org-babel-script-escape "ob-core" (str &optional force))
 
+(defvar org-src-lang-modes)
+
 ;; Make C-c ' open chrome-js blocks in javascript-mode for syntax help.
-(with-eval-after-load 'org-src
-  (add-to-list 'org-src-lang-modes '("chrome-js" . js)))
+;; Called at load time; if `org-src' has not been loaded yet,
+;; `org-src-lang-modes' is forward-declared above and `add-to-list'
+;; will define it on first use.
+(eval-when-compile (require 'org-src nil t))
+(add-to-list 'org-src-lang-modes '("chrome-js" . js))
 
 (defun chrome-server-babel--first-result (response)
   "Return the JS return value from the first frame in RESPONSE.

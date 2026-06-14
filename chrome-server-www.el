@@ -4,8 +4,10 @@
 
 ;; Author: Daniel M. German <dmg@turingmachine.org>
 ;; Maintainer: Daniel M. German <dmg@turingmachine.org>
-;; Keywords: browser, websocket, org, archive
-;; Homepage: https://github.com/dmgerman
+;; Version: 0.5
+;; Keywords: comm, tools, browser, org
+;; URL: https://github.com/dmgerman/chrome-server
+;; Package-Requires: ((emacs "27.1") (chrome-server "0.5"))
 
 ;; SPDX-License-Identifier: GPL-3.0-or-later
 ;;
@@ -73,11 +75,11 @@ Returns the path of the org file written."
          (file      (expand-file-name (concat basename ".org")  page-dir))
          (html-file (expand-file-name (concat basename ".html") page-dir)))
     (unless html
-      (error "chrome-server-www: payload contains no 'html'"))
+      (error "Payload contains no 'html'"))
     (condition-case err
         (make-directory page-dir t)
       (error
-       (error "chrome-server-www: could not create directory %s: %s"
+       (error "Could not create directory %s: %s"
               page-dir (error-message-string err))))
     (condition-case err
         (with-temp-file html-file
@@ -98,7 +100,7 @@ Returns the path of the org file written."
                                           (error-message-string err))
                      html))))
       (error
-       (error "chrome-server-www: could not write org file %s: %s"
+       (error "Could not write org file %s: %s"
               file (error-message-string err))))
     file))
 
@@ -107,7 +109,7 @@ Returns the path of the org file written."
 Images are extracted to MEDIA-DIR via pandoc's --extract-media flag.
 Signals an error if pandoc is not found or exits non-zero."
   (unless (executable-find chrome-server-pandoc-executable)
-    (error "chrome-server-www: pandoc not found (set chrome-server-pandoc-executable)"))
+    (error "Pandoc not found (set chrome-server-pandoc-executable)"))
   (with-temp-buffer
     (let ((exit-code (call-process-region
                       (chrome-server--strip-svg html) nil
@@ -117,7 +119,7 @@ Signals an error if pandoc is not found or exits non-zero."
                       "--wrap=none"
                       (format "--extract-media=%s" media-dir))))
       (unless (zerop exit-code)
-        (error "chrome-server-www: pandoc failed (exit %d): %s"
+        (error "Pandoc failed (exit %d): %s"
                exit-code (buffer-string)))
       (goto-char (point-min))
       (while (re-search-forward "^\\*+ +<<[^>]+>>\\s-*$" nil t)

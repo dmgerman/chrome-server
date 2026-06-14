@@ -1,12 +1,13 @@
-;;; chrome-server.el --- WebSocket bridge between Chrome extensions and Emacs  -*- lexical-binding: t; -*-
+;;; chrome-server.el --- WebSocket bridge to a Chrome MV3 extension  -*- lexical-binding: t; -*-
 
 ;; Copyright (C) 2026 Daniel M. German <dmg@turingmachine.org>
 
 ;; Author: Daniel M. German <dmg@turingmachine.org>
 ;; Maintainer: Daniel M. German <dmg@turingmachine.org>
-;; Keywords: browser, websocket, org
-;; Homepage: https://github.com/dmgerman
-;; Package-Requires: ((websocket "1.13"))
+;; Version: 0.5
+;; Keywords: comm, tools, browser, org
+;; URL: https://github.com/dmgerman/chrome-server
+;; Package-Requires: ((emacs "27.1") (websocket "1.13"))
 
 ;; SPDX-License-Identifier: GPL-3.0-or-later
 ;;
@@ -111,9 +112,10 @@ CALLBACK is invoked with the decoded response payload.  TIMER is the
 `run-at-time' timer that aborts the request on timeout.")
 
 (defvar chrome-server--rx-buffers nil
-  "Alist mapping client websocket to the bytes received so far for the
-in-progress fragmented message on that connection.  Cleared once the
-final fragment (FIN bit set) arrives or the client disconnects.")
+  "Per-client accumulators for in-progress fragmented messages.
+Alist mapping each client websocket to the bytes received so far for
+the in-progress fragmented message on that connection.  Cleared once
+the final fragment (FIN bit set) arrives or the client disconnects.")
 
 ;; ── Debug logging ────────────────────────────────────────────────────────────
 
@@ -128,7 +130,9 @@ final fragment (FIN bit set) arrives or the client disconnects.")
 
 (defun chrome-server--warn (fmt &rest args)
   "Surface a chrome-server warning to the user and the debug log.
-Goes both to *Messages* and to the *chrome-server* debug buffer."
+FMT and ARGS are passed through `format'.  The formatted message is
+emitted to *Messages* and appended to the *chrome-server* debug
+buffer."
   (let ((msg (apply #'format fmt args)))
     (message "chrome-server: %s" msg)
     (chrome-server--log "[WARN] %s" msg)))
@@ -389,12 +393,12 @@ re-enter the dispatcher."
               (lambda (payload)
                 (setq result payload
                       done   t)))))
-    (unless id (error "chrome-server: no client connected"))
+    (unless id (error "No client connected"))
     (let ((deadline (+ (float-time)
                        (+ 0.5 chrome-server-request-timeout))))
       (while (and (not done) (< (float-time) deadline))
         (accept-process-output nil 0.05)))
-    (unless done (error "chrome-server: request %s timed out" name))
+    (unless done (error "Request %s timed out" name))
     result))
 
 ;; ── Convenience: respond-fast-then-defer ─────────────────────────────────────
@@ -462,7 +466,7 @@ Returns an empty string if not set or already consumed."
 (defun chrome-server--require-payload (payload)
   "Signal if PAYLOAD is nil."
   (unless payload
-    (error "chrome-server: missing 'payload' in request")))
+    (error "Missing 'payload' in request")))
 
 (defun chrome-server--ok (&optional message)
   "Return a standard OK response payload, optionally with MESSAGE."
@@ -487,29 +491,33 @@ render at librsvg's huge default size in org buffers)."
 ;; ── Built-in handlers ────────────────────────────────────────────────────────
 
 (defun chrome-server--handle-org-capture (payload)
-  "Handle ORG_CAPTURE.  Respond-fast-then-defer."
+  "Handle ORG_CAPTURE request with PAYLOAD.
+Schedules the actual capture and returns immediately (respond-fast-then-defer)."
   (chrome-server--require-payload payload)
   (chrome-server-defer #'chrome-server--org-capture payload)
   (chrome-server--ok "Org-capture opened"))
 
 (defun chrome-server--handle-org-roam-capture (payload)
-  "Handle ORG_ROAM_CAPTURE.  Respond-fast-then-defer."
+  "Handle ORG_ROAM_CAPTURE request with PAYLOAD.
+Schedules the actual capture and returns immediately (respond-fast-then-defer)."
   (chrome-server--require-payload payload)
   (chrome-server-defer #'chrome-server--org-roam-capture payload)
   (chrome-server--ok "Org-roam-capture opened"))
 
 (defun chrome-server--handle-eww (payload)
-  "Handle EWW.  Respond-fast-then-defer."
+  "Handle EWW request with PAYLOAD.
+Schedules the eww invocation and returns immediately
+\(respond-fast-then-defer)."
   (chrome-server--require-payload payload)
   (unless (plist-get payload :url)
-    (error "chrome-server: missing url in payload"))
+    (error "Missing url in payload"))
   (chrome-server-defer #'chrome-server--eww payload)
   (chrome-server--ok "Opening in eww"))
 
 ;; ── Action implementations ───────────────────────────────────────────────────
 
 (defun chrome-server--org-capture (payload)
-  "Open org-capture pre-filled from PAYLOAD.
+  "Open `org-capture' pre-filled from PAYLOAD.
 Uses `chrome-server-org-capture-key' if set, otherwise prompts interactively."
   (condition-case err
       (let ((org-capture-initial (chrome-server--capture-initial payload)))

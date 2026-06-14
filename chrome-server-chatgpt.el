@@ -4,8 +4,10 @@
 
 ;; Author: Daniel M. German <dmg@turingmachine.org>
 ;; Maintainer: Daniel M. German <dmg@turingmachine.org>
-;; Keywords: browser, websocket, org, chatgpt
-;; Homepage: https://github.com/dmgerman
+;; Version: 0.5
+;; Keywords: comm, tools, browser, org
+;; URL: https://github.com/dmgerman/chrome-server
+;; Package-Requires: ((emacs "27.1") (chrome-server "0.5"))
 
 ;; SPDX-License-Identifier: GPL-3.0-or-later
 ;;
@@ -66,7 +68,7 @@ Headings are shifted so the topmost heading in HTML becomes org level 3,
 keeping pandoc output nested under the surrounding level-2 turn heading.
 Signals an error if pandoc is not found or exits non-zero."
   (unless (executable-find chrome-server-pandoc-executable)
-    (error "chrome-server-chatgpt: pandoc not found (set chrome-server-pandoc-executable)"))
+    (error "Pandoc not found (set chrome-server-pandoc-executable)"))
   (with-temp-buffer
     (let* ((min-lvl (chrome-server-chatgpt--min-heading-level html))
            (shift   (if min-lvl (- 3 min-lvl) 0))
@@ -78,7 +80,7 @@ Signals an error if pandoc is not found or exits non-zero."
                                           (format "--shift-heading-level-by=%d" shift)
                                           (format "--extract-media=%s" media-dir))))
       (unless (zerop exit-code)
-        (error "chrome-server-chatgpt: pandoc failed (exit %d): %s"
+        (error "Pandoc failed (exit %d): %s"
                exit-code (buffer-string)))
       ;; Remove headings that contain only org radio targets (e.g. "** <<_r_nh_>>")
       ;; and strip inline radio targets — both come from invisible HTML anchors
@@ -180,7 +182,7 @@ plus any extracted images.  Returns the path of the org file written."
          (turns (plist-get payload :turns))
          (id    (or (chrome-server-chatgpt--id url)
                     (progn
-                      (message "chrome-server-chatgpt: could not extract ID from URL: %s" url)
+                      (message "Could not extract ID from URL: %s" url)
                       "unknown")))
          (root  (expand-file-name chrome-server-chatgpt-dir))
          (conv-dir (or (chrome-server-chatgpt--find-existing-dir root id)
@@ -196,10 +198,10 @@ plus any extracted images.  Returns the path of the org file written."
     (condition-case err
         (make-directory conv-dir t)
       (error
-       (error "chrome-server-chatgpt: could not create directory %s: %s"
+       (error "Could not create directory %s: %s"
               conv-dir (error-message-string err))))
     (unless turns
-      (error "chrome-server-chatgpt: payload contains no 'turns'"))
+      (error "Payload contains no 'turns'"))
     (condition-case err
         (chrome-server-chatgpt--save-html turns html-file)
       (error
@@ -216,7 +218,7 @@ plus any extracted images.  Returns the path of the org file written."
           (dolist (turn turns)
             (insert (chrome-server-chatgpt--format-turn turn conv-dir))))
       (error
-       (error "chrome-server-chatgpt: could not write org file %s: %s"
+       (error "Could not write org file %s: %s"
               file (error-message-string err))))
     file))
 
