@@ -112,44 +112,59 @@ a response counts as deny.
 
 ** =chrome-server-request=
 
-The central elisp entry point for invoking a Chrome handler.
-Synchronous; blocks until the Chrome extension responds or the
-=chrome-server-request-timeout= deadline (default 10 seconds) expires.
+=chrome-server-request= is the elisp function that sends a request to
+the Chrome extension and returns its response.  It is the function
+you call whenever you want Emacs to invoke a handler in the Chrome
+extension — including running JavaScript in a tab.  The call is
+synchronous: it blocks until the Chrome extension replies, or until
+=chrome-server-request-timeout= (10 seconds by default) elapses,
+whichever happens first.
+
+Its signature is:
 
 #+begin_src emacs-lisp
 (chrome-server-request NAME &optional PAYLOAD)
 #+end_src
 
-| Argument  | Type                                                              |
-|-----------+-------------------------------------------------------------------|
-| =NAME=    | string — the WebSocket request name (e.g. ="EVAL_IN_ACTIVE_TAB"=) |
-| =PAYLOAD= | optional plist — keys depend on the request                       |
+=NAME= is a string identifying the handler — for example
+="EVAL_IN_ACTIVE_TAB"= to evaluate JavaScript, or ="GET_ALL_TABS"= to
+list the open tabs.  =PAYLOAD= is an optional plist whose keys depend
+on which handler is named; each handler documents the keys it
+recognises.
 
-Returns a response plist with =:status= (either ="ok"= or ="error"=)
-and a request-specific body.  On error, =:message= contains a
-human-readable reason.
+The function returns a plist with two fields you should always check.
+=:status= is the string ="ok"= when the request succeeded and
+="error"= when something went wrong.  On error, the response also
+carries =:message= with a human-readable explanation.  On success,
+the rest of the response is specific to the handler — for example,
+=EVAL_IN_ACTIVE_TAB= populates =:result= with the value produced by
+the script.
 
-For =EVAL_IN_ACTIVE_TAB= the payload keys are:
+When the handler is =EVAL_IN_ACTIVE_TAB=, the payload accepts three
+keys:
 
-| Key       | Meaning                                                              |
-|-----------+----------------------------------------------------------------------|
-| =:code=   | string — the JavaScript to evaluate                                  |
-| =:tabId=  | optional integer — target tab (default: the active tab in the current window) |
-| =:world=  | optional string — ="MAIN"= (page context, default) or ="USER_SCRIPT"= (isolated) |
+| Key      | Meaning                                                                |
+|----------+------------------------------------------------------------------------|
+| =:code=  | string — the JavaScript to evaluate                                    |
+| =:tabId= | optional integer — target tab (default: the active tab in the current window) |
+| =:world= | optional string — ="MAIN"= (the page's window context, default) or ="USER_SCRIPT"= (an isolated world) |
 
 The response =:result= is an array of =InjectionResult= plists, one
-per frame the script ran in.  Each has =:documentId=, =:frameId=, and
-=:result= (the value of the last JavaScript expression).
+per frame the script ran in.  Each entry carries =:documentId=,
+=:frameId=, and =:result= — the value of the script's last
+expression.
 
-Asynchronous variant:
+If blocking the editor is not appropriate (long-running scripts,
+calls made from inside another WebSocket callback), use the
+asynchronous variant:
 
 #+begin_src emacs-lisp
 (chrome-server-request-async NAME PAYLOAD CALLBACK)
 #+end_src
 
-Returns the request id immediately; invokes =CALLBACK= with the
-response plist when it arrives.  Safe to invoke from any context,
-including inside a WebSocket callback.
+It returns the request id immediately and invokes =CALLBACK= with the
+response plist once the Chrome extension replies.  Unlike the
+synchronous form, it is safe to use from any context.
 
 ** Minimal example
 
@@ -160,8 +175,13 @@ including inside a WebSocket callback.
 ;;     :result ((:documentId "..." :frameId 0 :result 60.34)))
 #+end_src
 
-The first request to a tab displays the consent overlay.  Extracting
-the value from a one-frame result:
+The first request to a fresh tab causes the Chrome extension to
+display the consent overlay; subsequent calls to the same tab go
+through silently until consent is revoked or the tab is closed.
+
+For most uses you only care about the value returned by the
+JavaScript expression, not the surrounding response envelope.  The
+pattern for extracting it from a single-frame result is:
 
 #+begin_src emacs-lisp
 (let ((r (chrome-server-request "EVAL_IN_ACTIVE_TAB"
@@ -172,12 +192,15 @@ the value from a one-frame result:
 
 ** =chrome-js= source blocks
 
-The =chrome-server-babel= module defines =org-babel-execute:chrome-js=
-as a convenience layer over =chrome-server-request=.  The block body
-is the =:code= payload; the value of the last expression becomes the
-block result.
+For one-off JavaScript snippets, writing out a =chrome-server-request=
+call by hand is more typing than necessary.  The =chrome-server-babel=
+module provides =org-babel-execute:chrome-js=, which wraps the function
+behind an org-mode source block: the body of the block becomes the
+=:code= payload, and the value of the last JavaScript expression is
+returned as the block's result.  Babel handles the response
+extraction, so the elisp glue is invisible.
 
-Header arguments:
+The block accepts three optional header arguments:
 
 | Argument    | Values                          | Default      |
 |-------------+---------------------------------+--------------|
@@ -232,12 +255,21 @@ location.origin
 
 * Querying and controlling the browser from Emacs
 
+The same =chrome-server-request= function used for JavaScript
+evaluation also invokes the other handlers the Chrome extension
+exposes.  The built-in handler names cover the operations Emacs is
+most likely to need: =GET_ALL_TABS= returns the current tab list,
+=GET_ACTIVE_TAB= returns just the focused tabs of each window,
+=OPEN_TAB= creates a new tab at a given URL, =FOCUS_TAB= switches to
+an existing tab, and =CLOSE_TAB= closes one.  Each handler's payload
+keys and response shape are documented in =CONTRIBUTING.org=.
+
 #+begin_src emacs-lisp
 ;; List every open tab as title/url pairs
 (mapcar (lambda (tab) (cons (plist-get tab :title) (plist-get tab :url)))
         (chrome-server-request "GET_ALL_TABS" nil))
 
-;; Jump to a tab by id
+;; Switch to a tab by id (and focus its window if it is in another window)
 (chrome-server-request "FOCUS_TAB" '(:id 1234 :focusWindow t))
 
 ;; Open a new tab
