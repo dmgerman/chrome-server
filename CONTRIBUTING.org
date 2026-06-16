@@ -15,12 +15,13 @@ for what =chrome-server= does and how it's set up.
 | =chrome-server-chatgpt.el=        | =CHATGPT=                                                                                  |
 | =chrome-server-youtube.el=        | =YOUTUBE=, =YOUTUBE_TRANSCRIPT=                                                             |
 | =chrome-server-babel.el=          | =org-babel-execute:chrome-js=                                                              |
-| =extension/config.json=           | Single source of truth for the Chrome extension                                            |
-| =extension/src/=                  | Chrome extension JS (service worker, offscreen, popup, options, content scripts, consent)  |
-| =extension/html/=, =icons/=       | Chrome extension HTML + icons                                                              |
+| =extension/config.json=           | Single source of truth for the extension (shared + per-target overlays)                    |
+| =extension/src/=                  | Shared extension JS (handlers, popup, options, content scripts, consent)                   |
+| =extension/html/=, =icons/=       | Shared extension HTML + icons                                                              |
+| =extension/targets/<name>/=       | Per-target overlay (=chrome/= today; =firefox/= placeholder)                                |
 | =extension/scripts/=              | =build-manifest.py=, =make-red-icons.py=                                                   |
-| =extension/Makefile=              | =make build= / =make load= / =make package= / =make lint=                                   |
-| =extension/build/=                | Generated; what Chrome's "Load unpacked" reads.  Gitignored.                                |
+| =extension/Makefile=              | =make= (=all=) / =make chrome= / =make firefox= / =make package= / =make lint=               |
+| =extension/build/<target>/=       | Generated per-target loadable directory.  Gitignored.                                       |
 | =spookfox/=, =emacsProtocol/=     | Frozen reference material from earlier designs.  Do not modify.                            |
 | =ai/=                             | Design rationale and debugging notes.                                                       |
 
@@ -294,22 +295,27 @@ time).
 
 ** Build pipeline
 
-=scripts/build-manifest.py= reads =config.json= and emits
-=build/manifest.json= — the static infrastructure from
-=config.extension=, =content_scripts= from =config.contentScripts=,
-=commands= collected from =menus[].command=.
+=scripts/build-manifest.py= reads =config.json= and, given
+=--target chrome= or =--target firefox=, emits the matching
+=build/<target>/manifest.json= — deep-merging =config.extension=
+with =config.extensionTargets.<target>=, adding =content_scripts=
+from =config.contentScripts= and =commands= collected from
+=menus[].command=.
 
 =make lint= verifies every JS file's =import= statements reference
-files in =SRC_FILES=.  Forgetting to add a new file to that list
-manifests as "Service worker registration failed.  Status code: 3".
+files that exist in the build tree.  Forgetting to add a new file to
+=SHARED_FILES= or to the per-target overlay manifests as "Service
+worker registration failed.  Status code: 3".
 
 =make help= lists the targets.
 
 * Build / verify cycle
 
 #+begin_src bash
-# Chrome extension
-cd extension && make build
+# Extension (default builds every known target)
+cd extension && make           # same as `make all`: chrome + firefox
+cd extension && make chrome    # only build/chrome/
+cd extension && make firefox   # only build/firefox/ (placeholder)
 
 # Elisp — byte-compile to catch warnings:
 emacs --batch -Q --eval '(require (quote package))' \

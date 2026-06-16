@@ -9,11 +9,9 @@
       "activeTab",
       "contextMenus",
       "notifications",
-      "offscreen",
       "scripting",
       "storage",
-      "tabs",
-      "userScripts"
+      "tabs"
     ],
     "host_permissions": [
       "ws://127.0.0.1:9130/*",
@@ -21,11 +19,6 @@
       "https://*/*",
       "http://*/*"
     ],
-
-    "background": {
-      "service_worker": "src/background.js",
-      "type": "module"
-    },
 
     "options_ui": {
       "page": "html/options.html",
@@ -46,6 +39,29 @@
       "16":  "icons/icon16.png",
       "48":  "icons/icon48.png",
       "128": "icons/icon128.png"
+    }
+  },
+
+  "extensionTargets": {
+    "chrome": {
+      "permissions": ["offscreen", "userScripts"],
+      "background": {
+        "service_worker": "src/background.js",
+        "type": "module"
+      }
+    },
+    "firefox": {
+      "permissions": ["userScripts"],
+      "background": {
+        "scripts": ["src/background.js"],
+        "persistent": true
+      },
+      "browser_specific_settings": {
+        "gecko": {
+          "id": "chrome-server@dmgerman",
+          "strict_min_version": "115.0"
+        }
+      }
     }
   },
 

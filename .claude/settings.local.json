@@ -25,7 +25,13 @@
       "Bash(git ls-tree *)",
       "Bash(make help *)",
       "Bash(make)",
-      "Bash(xargs -I '{}' sh -c 'h=$\\(echo {} | cut -d'\\\\'' '\\\\'' -f1\\); n=$\\(git show $h -- README.org 2>/dev/null | grep -cE '\\\\''^-[ ,]*#\\\\+begin_src chrome-js'\\\\''\\); m=$\\(git show $h -- README.org 2>/dev/null | grep -cE '\\\\''^-#\\\\+begin_example'\\\\''\\); if [ $n -gt 0 ] || [ $m -gt 0 ]; then echo \"$h removed=$n+$m  msg=$\\(git log -1 --format=%s $h\\)\"; fi')"
+      "Bash(xargs -I '{}' sh -c 'h=$\\(echo {} | cut -d'\\\\'' '\\\\'' -f1\\); n=$\\(git show $h -- README.org 2>/dev/null | grep -cE '\\\\''^-[ ,]*#\\\\+begin_src chrome-js'\\\\''\\); m=$\\(git show $h -- README.org 2>/dev/null | grep -cE '\\\\''^-#\\\\+begin_example'\\\\''\\); if [ $n -gt 0 ] || [ $m -gt 0 ]; then echo \"$h removed=$n+$m  msg=$\\(git log -1 --format=%s $h\\)\"; fi')",
+      "Bash(mkdir -p targets/chrome/src targets/chrome/html)",
+      "Bash(mv src/background.js targets/chrome/src/)",
+      "Bash(mv src/offscreen.js targets/chrome/src/)",
+      "Bash(mv html/offscreen.html targets/chrome/html/)",
+      "Bash(make firefox *)",
+      "Bash(make all *)"
     ]
   }
 }

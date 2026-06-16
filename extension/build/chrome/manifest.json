@@ -1,0 +1,104 @@
+{
+  "manifest_version": 3,
+  "name": "Chrome Server (Emacs bridge)",
+  "version": "2.0",
+  "description": "Bidirectional WebSocket bridge between Chrome and a running Emacs instance.",
+  "permissions": [
+    "activeTab",
+    "contextMenus",
+    "notifications",
+    "scripting",
+    "storage",
+    "tabs",
+    "offscreen",
+    "userScripts"
+  ],
+  "host_permissions": [
+    "ws://127.0.0.1:9130/*",
+    "http://127.0.0.1:9130/*",
+    "https://*/*",
+    "http://*/*"
+  ],
+  "options_ui": {
+    "page": "html/options.html",
+    "open_in_tab": true
+  },
+  "action": {
+    "default_popup": "html/popup.html",
+    "default_title": "Chrome Server",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "background": {
+    "service_worker": "src/background.js",
+    "type": "module"
+  },
+  "commands": {
+    "org-capture": {
+      "description": "Org-capture from current page/selection",
+      "suggested_key": {
+        "default": "Ctrl+Shift+C",
+        "mac": "MacCtrl+Shift+C"
+      }
+    },
+    "org-roam-capture": {
+      "description": "Org-roam-capture from current page/selection",
+      "suggested_key": {
+        "default": "Ctrl+Shift+R",
+        "mac": "MacCtrl+Shift+R"
+      }
+    },
+    "eww": {
+      "description": "Open current page in eww",
+      "suggested_key": {
+        "default": "Ctrl+Shift+W",
+        "mac": "MacCtrl+Shift+W"
+      }
+    },
+    "save-page": {
+      "description": "Save current page (assign a key at chrome://extensions/shortcuts)"
+    },
+    "save-chatgpt": {
+      "description": "Save current ChatGPT conversation",
+      "suggested_key": {
+        "default": "Ctrl+Shift+G",
+        "mac": "MacCtrl+Shift+G"
+      }
+    },
+    "youtube": {
+      "description": "Capture YouTube video for later (assign a key at chrome://extensions/shortcuts)"
+    },
+    "youtube-transcript": {
+      "description": "Save YouTube transcript (assign a key at chrome://extensions/shortcuts)"
+    }
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "src/content.js"
+      ],
+      "run_at": "document_idle",
+      "all_frames": false
+    },
+    {
+      "matches": [
+        "https://chatgpt.com/*"
+      ],
+      "js": [
+        "src/content-chatgpt.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ]
+}

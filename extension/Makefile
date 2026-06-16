@@ -4,52 +4,87 @@
 EXTENSION_NAME ?= chrome-server-extension
 VERSION        := $(shell python3 -c 'import json; print(json.load(open("config.json"))["extension"]["version"])')
 
-# ── Directories ──────────────────────────────────────────────────────────────
+# ── Build targets and directories ────────────────────────────────────────────
 #
-# Everything under extension/ (this directory) is SOURCE.  The Makefile
-# materialises a clean, loadable copy in $(BUILD_DIR) — Chrome's
-# "Load unpacked" should always point there, never at the source tree.
-# The release zip lands in $(DIST_DIR), outside the source tree.
+# Each browser target gets its own loadable directory under build/.
+# `make` with no arguments builds every known target.
+#
+#   make            same as `make all`
+#   make all        build every known target
+#   make chrome     materialise build/chrome/
+#   make firefox    materialise build/firefox/
+#   make package    zip build/<TARGET>/ (controlled by TARGET=... variable)
+#
+# Sources are organised as:
+#   src/              JS shared between all targets
+#   html/             HTML shared between all targets
+#   icons/            icons shared between all targets
+#   targets/<name>/   per-target overlays (background script, eval impl,
+#                     anything specific to that runtime)
+#
+# A per-target build copies the shared tree, then overlays
+# targets/<name>/ on top, then generates manifest.json from
+# config.json + config.extensionTargets[<name>].
 
-BUILD_DIR        ?= build
+TARGET           ?= chrome
+KNOWN_TARGETS    := chrome firefox
+
+BUILD_DIR        ?= build/$(TARGET)
 DIST_DIR         ?= ../dist
-ZIP              := $(DIST_DIR)/$(EXTENSION_NAME)-$(VERSION).zip
+ZIP              := $(DIST_DIR)/$(EXTENSION_NAME)-$(TARGET)-$(VERSION).zip
 BUILD_ABS        := $(abspath $(BUILD_DIR))
 MANIFEST_BUILDER := scripts/build-manifest.py
 
-# Sources copied verbatim into $(BUILD_DIR).  manifest.json is generated
-# from config.json, so it is NOT listed here — see the build rule.
-SRC_FILES := config.json \
-             src/background.js \
-             src/handlers.js \
-             src/payload.js \
-             src/consent.js \
-             src/offscreen.js \
-             src/popup.js \
-             src/options.js \
-             src/content.js \
-             src/content-chatgpt.js \
-             html/offscreen.html \
-             html/popup.html \
-             html/options.html \
-             icons/icon16.png \
-             icons/icon48.png \
-             icons/icon128.png \
-             icons/icon-red-16.png \
-             icons/icon-red-48.png \
-             icons/icon-red-128.png
+# Shared sources copied verbatim into every build.  manifest.json is
+# generated and is NOT listed here.
+SHARED_FILES := config.json \
+                src/handlers.js \
+                src/payload.js \
+                src/consent.js \
+                src/popup.js \
+                src/options.js \
+                src/content.js \
+                src/content-chatgpt.js \
+                html/popup.html \
+                html/options.html \
+                icons/icon16.png \
+                icons/icon48.png \
+                icons/icon128.png \
+                icons/icon-red-16.png \
+                icons/icon-red-48.png \
+                icons/icon-red-128.png
 
-.PHONY: all build package lint clean help
+# Per-target overlay files.  Discovered at build time by `find`
+# under targets/$(TARGET)/, so adding a new file in a target tree
+# requires no Makefile edit.
 
-all: build
+.PHONY: default all chrome firefox build package lint clean help
+
+# `make` with no arguments builds every known target.
+default: all
+
+all: $(KNOWN_TARGETS)
+
+chrome:
+	@$(MAKE) --no-print-directory TARGET=chrome build
+
+firefox:
+	@$(MAKE) --no-print-directory TARGET=firefox build
+
+# `build` is the worker target; users normally invoke `make`,
+# `make chrome`, or `make firefox` rather than calling it directly.
+build: $(BUILD_DIR)/manifest.json
 
 help:
 	@echo "Targets:"
-	@echo "  make           — same as 'make build'"
-	@echo "  make build     — materialise $(BUILD_DIR)/ (load this in Chrome)"
-	@echo "  make package   — produce $(ZIP) from $(BUILD_DIR)"
-	@echo "  make lint      — validate config.json + check source files exist"
-	@echo "  make clean     — remove $(BUILD_DIR)/ and $(DIST_DIR)/"
+	@echo "  make                same as 'make all'"
+	@echo "  make all            build every known target ($(KNOWN_TARGETS))"
+	@echo "  make chrome         materialise build/chrome/"
+	@echo "  make firefox        materialise build/firefox/"
+	@echo "  make package        produce $(DIST_DIR)/$(EXTENSION_NAME)-<TARGET>-<VERSION>.zip"
+	@echo "                      (set TARGET=firefox for the Firefox variant)"
+	@echo "  make lint           validate config.json and check source files exist"
+	@echo "  make clean          remove build/ and $(DIST_DIR)/"
 
 # ── Source-side checks (no build artefacts) ─────────────────────────────────
 
@@ -57,38 +92,53 @@ lint:
 	@echo "validating config.json"
 	@python3 -c 'import json; json.load(open("config.json"))' \
 	  || { echo "config.json is not valid JSON"; exit 1; }
-	@for f in $(SRC_FILES); do \
-	  if [ ! -f "$$f" ]; then echo "missing source file: $$f"; exit 1; fi; \
+	@for f in $(SHARED_FILES); do \
+	  if [ ! -f "$$f" ]; then echo "missing shared source file: $$f"; exit 1; fi; \
 	done
-	@echo "checking that every imported JS module is in SRC_FILES"
-	@for f in $(filter src/%.js,$(SRC_FILES)); do \
-	  for imp in $$(grep -oE 'from[[:space:]]*"\./[^"]+\.js"' "$$f" \
-	                  | sed -E 's/.*"\.\/([^"]+)"/src\/\1/'); do \
-	    case " $(SRC_FILES) " in \
-	      *" $$imp "*) ;; \
-	      *) echo "$$f imports $$imp but it is not in SRC_FILES"; exit 1 ;; \
-	    esac; \
-	  done; \
+	@for t in $(KNOWN_TARGETS); do \
+	  if [ ! -d "targets/$$t" ]; then \
+	    echo "warning: targets/$$t/ does not exist; skipping checks"; \
+	    continue; \
+	  fi; \
 	done
 	@echo "OK"
 
-# ── Build the loadable directory ─────────────────────────────────────────────
+# ── Build the loadable directory for $(TARGET) ──────────────────────────────
 
-# Re-materialise whenever any source file or the manifest builder changes.
-$(BUILD_DIR)/manifest.json: lint config.json $(MANIFEST_BUILDER) $(SRC_FILES)
+$(BUILD_DIR)/manifest.json: lint config.json $(MANIFEST_BUILDER) $(SHARED_FILES)
+	@case " $(KNOWN_TARGETS) " in *" $(TARGET) "*) ;; \
+	  *) echo "unknown TARGET=$(TARGET); known: $(KNOWN_TARGETS)"; exit 1 ;; esac
 	@rm -rf $(BUILD_DIR)
 	@mkdir -p $(BUILD_DIR)
-	@echo "copying sources into $(BUILD_DIR)/"
-	@for f in $(SRC_FILES); do \
+	@echo "copying shared sources into $(BUILD_DIR)/"
+	@for f in $(SHARED_FILES); do \
 	  mkdir -p "$(BUILD_DIR)/$$(dirname $$f)"; \
 	  cp "$$f" "$(BUILD_DIR)/$$f"; \
 	done
-	@python3 $(MANIFEST_BUILDER) $(BUILD_DIR)/manifest.json
+	@if [ -d "targets/$(TARGET)" ]; then \
+	  echo "overlaying targets/$(TARGET)/ into $(BUILD_DIR)/"; \
+	  cd targets/$(TARGET) && find . -type f -print0 | while IFS= read -r -d '' f; do \
+	    rel="$${f#./}"; \
+	    mkdir -p "$(BUILD_ABS)/$$(dirname $$rel)"; \
+	    cp "$$f" "$(BUILD_ABS)/$$rel"; \
+	  done; \
+	else \
+	  echo "warning: targets/$(TARGET)/ does not exist (no overlay applied)"; \
+	fi
+	@python3 $(MANIFEST_BUILDER) --target $(TARGET) $(BUILD_DIR)/manifest.json
 	@python3 -c 'import json; json.load(open("$(BUILD_DIR)/manifest.json"))' \
 	  || { echo "generated manifest is not valid JSON"; exit 1; }
+	@echo "checking that every imported JS module resolves inside $(BUILD_DIR)/"
+	@cd $(BUILD_DIR) && for f in $$(find src -name '*.js'); do \
+	  for imp in $$(grep -oE 'from[[:space:]]*"\./[^"]+\.js"' "$$f" \
+	                  | sed -E 's/.*"\.\/([^"]+)"/\1/'); do \
+	    dir="$$(dirname $$f)"; \
+	    if [ ! -f "$$dir/$$imp" ]; then \
+	      echo "$$f imports $$imp but $$dir/$$imp does not exist"; exit 1; \
+	    fi; \
+	  done; \
+	done
 	@echo "build OK -> $(BUILD_ABS)"
-
-build: $(BUILD_DIR)/manifest.json
 
 # ── Package and clean ────────────────────────────────────────────────────────
 
@@ -102,4 +152,4 @@ package: build $(DIST_DIR)
 	@echo "wrote $(ZIP)"
 
 clean:
-	rm -rf $(BUILD_DIR) $(DIST_DIR)
+	rm -rf build $(DIST_DIR)

@@ -13,7 +13,7 @@ architecture, request catalog, and configuration schema live in
   the wire protocol and the old extension; if either ever needs an
   update, ask first.
 - **Edit only `extension/`, never `extension/build/`.**  The build dir
-  is gitignored and regenerated from sources by `make build`.
+  is gitignored and regenerated from sources by `make`.
 
 ## Source map
 
@@ -24,18 +24,22 @@ architecture, request catalog, and configuration schema live in
 | `chrome-server-chatgpt.el`        | `CHATGPT`                                                   |
 | `chrome-server-youtube.el`        | `YOUTUBE`, `YOUTUBE_TRANSCRIPT`                              |
 | `chrome-server-babel.el`          | `org-babel-execute:chrome-js`                               |
-| `extension/config.json`           | The single source of truth for the extension (manifest infra, menus, handlers, content scripts) |
-| `extension/src/`                  | Extension JS (service worker, offscreen, popup, options, content scripts, consent) |
-| `extension/html/` / `icons/`      | Extension HTML + icons                                       |
-| `extension/scripts/`              | `build-manifest.py`, `make-red-icons.py`                    |
-| `extension/Makefile`              | `make build` / `make load` / `make package` / `make lint`    |
+| `extension/config.json`           | Single source of truth: shared `extension` block + per-target overlays in `extensionTargets.<name>`, plus menus, handlers, contentScripts |
+| `extension/src/`                  | Shared extension JS (handlers, popup, options, content scripts, consent) |
+| `extension/html/` / `icons/`      | Shared extension HTML + icons                                |
+| `extension/targets/<name>/`       | Per-target overlay tree (e.g. `chrome/` has background.js, offscreen.js, eval-impl.js; `firefox/` is a placeholder) |
+| `extension/scripts/`              | `build-manifest.py` (takes `--target`), `make-red-icons.py`  |
+| `extension/Makefile`              | `make` (= `make all`) / `make chrome` / `make firefox` / `make package` / `make lint` |
+| `extension/build/<target>/`       | Generated per-target loadable directory. Gitignored.         |
 
 ## Build / verify cycle
 
 ```bash
 # Extension changes:
-cd extension && make build      # also runs `make lint`
-                                # generated manifest.json lands in build/
+cd extension && make              # builds every known target (chrome + firefox)
+cd extension && make chrome       # builds build/chrome/ only
+cd extension && make firefox      # placeholder Firefox build (no WebSocket yet)
+                                  # `make lint` runs as part of each target build
 
 # Elisp changes — byte-compile to catch warnings before reload.
 # Either let package.el resolve `websocket`:

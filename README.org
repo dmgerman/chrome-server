@@ -59,8 +59,8 @@ the short form.
 2. *Load the Chrome extension.*  In Chrome:
 
    1. Open =chrome://extensions= and turn on *Developer mode* (top right).
-   2. Click *Load unpacked* and select =extension/build/= from this
-      repository — the directory is committed already built, so no
+   2. Click *Load unpacked* and select =extension/build/chrome/= from
+      this repository — the directory is committed already built, so no
       build step is required.
    3. (Only if you want JavaScript evaluation) open the extension's
       *Details* page and toggle *Allow User Scripts* on.
@@ -431,13 +431,13 @@ The full list is in =CONTRIBUTING.org=.
 ** Chrome extension
 
 The built extension is included in this repository under
-=extension/build/= and is the directory Chrome's "Load unpacked"
-expects.  No build step is required to use it as shipped.
+=extension/build/chrome/= and is the directory Chrome's "Load
+unpacked" expects.  No build step is required to use it as shipped.
 
 In Chrome:
 
 1. Turn on Developer mode (top right of =chrome://extensions=).
-2. Click "Load unpacked" and select =extension/build/=.
+2. Click "Load unpacked" and select =extension/build/chrome/=.
 3. Click Details → toggle *Allow User Scripts* on (only needed if you
    want =EVAL_IN_ACTIVE_TAB= / =chrome-js= blocks to work).
 
@@ -446,9 +446,14 @@ The popup should turn green within a few seconds.  If not, click
 
 *Optional: rebuilding after edits.*  If you customise
 =extension/config.json= or change anything under =extension/src/=,
-=extension/html/=, or =extension/icons/=, run =make= from the
-=extension/= directory to refresh =extension/build/=.  Then reload
-the extension card in =chrome://extensions= to pick up the change.
+=extension/html/=, =extension/icons/=, or =extension/targets/chrome/=,
+run =make= from the =extension/= directory to refresh
+=extension/build/chrome/=.  Then reload the extension card in
+=chrome://extensions= to pick up the change.
+
+A second target tree, =extension/targets/firefox/=, is present as a
+placeholder for a future Firefox build.  =make firefox= produces
+=extension/build/firefox/= but does not yet connect to Emacs.
 
 ** Customising
 

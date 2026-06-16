@@ -20,6 +20,7 @@
 // manifest declares in permissions.
 
 import { ensureConsent, tabHasConsent } from "./consent.js";
+import { evalAvailable, evalUnavailableMessage, evalInTab } from "./eval-impl.js";
 
 // chrome.action.setIcon({path}) fails inside MV3 service workers
 // ("Failed to fetch") regardless of path correctness.  We build ImageData
@@ -78,9 +79,9 @@ const SHAPE_ADAPTERS = {
     return await chrome.tabs.remove(payload.id);
   },
 
-  // { code: "..." } -> chrome.userScripts.execute({ js:[{code}], target:{...} })
+  // { code: "..." } -> runtime-specific eval primitive in ./eval-impl.js.
   // Defaults to the active tab and world: "MAIN" (sees the page's window).
-  // Gated by ensureConsent: the first invocation on each tab paints an
+  // Gated by ensureConsent: the first invocation on each tab displays an
   // in-page overlay asking the user to allow/deny.
   async "user-script"(payload) {
     if (!payload || typeof payload.code !== "string") {
@@ -92,10 +93,8 @@ const SHAPE_ADAPTERS = {
       if (!tab) throw new Error("no active tab for user-script execution");
       tabId = tab.id;
     }
-    if (!chrome.userScripts || typeof chrome.userScripts.execute !== "function") {
-      throw new Error(
-        "chrome.userScripts.execute unavailable. Enable 'Allow User Scripts' for this extension in chrome://extensions."
-      );
+    if (!evalAvailable()) {
+      throw new Error(evalUnavailableMessage());
     }
     // Per-tab consent.  Throws on deny or 30s timeout.
     await ensureConsent(tabId, payload.code);
@@ -103,9 +102,9 @@ const SHAPE_ADAPTERS = {
     // to granted (user clicked Allow 1h / Allow this tab in the overlay).
     // Sync the toolbar icon so the tab looks red right away.
     await syncTabIcon(tabId);
-    const result = await chrome.userScripts.execute({
-      target: { tabId },
-      js: [{ code: payload.code }],
+    const result = await evalInTab({
+      tabId,
+      code:  payload.code,
       world: payload.world ?? "MAIN",
     });
     return { status: "ok", result };

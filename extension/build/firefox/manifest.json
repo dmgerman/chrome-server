@@ -7,7 +7,6 @@
     "activeTab",
     "contextMenus",
     "notifications",
-    "offscreen",
     "scripting",
     "storage",
     "tabs",
@@ -19,10 +18,6 @@
     "https://*/*",
     "http://*/*"
   ],
-  "background": {
-    "service_worker": "src/background.js",
-    "type": "module"
-  },
   "options_ui": {
     "page": "html/options.html",
     "open_in_tab": true
@@ -40,6 +35,18 @@
     "16": "icons/icon16.png",
     "48": "icons/icon48.png",
     "128": "icons/icon128.png"
+  },
+  "background": {
+    "scripts": [
+      "src/background.js"
+    ],
+    "persistent": true
+  },
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "chrome-server@dmgerman",
+      "strict_min_version": "115.0"
+    }
   },
   "commands": {
     "org-capture": {
