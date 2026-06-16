@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2026 Daniel M. German <dmg@turingmachine.org>
+// Assisted-by: Claude:claude-opus-4-7
 //
 // payload.js — build the request payload a menu sends to Emacs.
 //

@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2026 Daniel M. German <dmg@turingmachine.org>
+// Assisted-by: Claude:claude-opus-4-7
 //
 // options.js — edit menus[] and handlers[] in chrome.storage.local,
 // plus per-action overrides for "raise Emacs?".

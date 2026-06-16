@@ -3,6 +3,7 @@
 ;; Copyright (C) 2026 Daniel M. German <dmg@turingmachine.org>
 
 ;; Author: Daniel M. German <dmg@turingmachine.org>
+;; Assisted-by: Claude:claude-opus-4-7
 ;; Maintainer: Daniel M. German <dmg@turingmachine.org>
 ;; Keywords: comm, tools, browser, org
 ;; URL: https://github.com/dmgerman/browsel

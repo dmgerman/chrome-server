@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Copyright (C) 2026 Daniel M. German <dmg@turingmachine.org>
+# Assisted-by: Claude:claude-opus-4-7
 """Generate manifest.json from config.json.
 
 config.json is the SINGLE SOURCE OF TRUTH for this extension:

@@ -8,24 +8,24 @@ for what =browsel= does and how it's set up.
 
 * Repository layout
 
-| Path                              | Owns                                                                                       |
-|-----------------------------------+--------------------------------------------------------------------------------------------|
+| Path                      | Owns                                                                                                                                |
+|---------------------------+-------------------------------------------------------------------------------------------------------------------------------------|
 | =browsel.el=                | Server lifecycle, JSON frame dispatch, async/sync request primitives, shared helpers, =ORG_CAPTURE= / =ORG_ROAM_CAPTURE= / =EWW= handlers |
-| =browsel-www.el=            | =SAVE_PAGE=                                                                                |
-| =browsel-chatgpt.el=        | =CHATGPT=                                                                                  |
-| =browsel-youtube.el=        | =YOUTUBE=, =YOUTUBE_TRANSCRIPT=                                                             |
-| =browsel-babel.el=          | =org-babel-execute:browsel-js=                                                              |
-| =extension/config.json=           | Single source of truth for the extension (shared + per-target overlays)                    |
-| =extension/src/=                  | Shared extension JS (handlers, popup, options, content scripts, consent)                   |
-| =extension/html/=, =icons/=       | Shared extension HTML + icons                                                              |
-| =extension/targets/<name>/=       | Per-target overlay (=chrome/= Manifest V3, =firefox/= Manifest V2)                          |
-| =extension/scripts/=              | =build-manifest.py=, =make-red-icons.py=                                                   |
-| =extension/Makefile=              | =make= (=all=) / =make chrome= / =make firefox= / =make package= / =make lint=               |
-| =extension/build/<target>/=       | Generated per-target loadable directory.  Gitignored.                                       |
-| =spookfox/=, =emacsProtocol/=     | Frozen reference material from earlier designs.  Do not modify.                            |
-| =ai/=                             | Design rationale and debugging notes.                                                       |
+| =browsel-www.el=            | =SAVE_PAGE=                                                                                                                           |
+| =browsel-chatgpt.el=        | =CHATGPT=                                                                                                                             |
+| =browsel-youtube.el=        | =YOUTUBE=, =YOUTUBE_TRANSCRIPT=                                                                                                         |
+| =browsel-babel.el=          | =org-babel-execute:browsel-js=                                                                                                        |
+| =extension/config.json=     | Single source of truth for the extension (shared + per-target overlays)                                                             |
+| =extension/src/=            | Shared extension JS (handlers, popup, options, content scripts, consent)                                                            |
+| =extension/html/=, =icons/=   | Shared extension HTML + icons                                                                                                       |
+| =extension/targets/<name>/= | Per-target overlay (=chrome/= Manifest V3, =firefox/= Manifest V2)                                                                      |
+| =extension/scripts/=        | =build-manifest.py=, =make-red-icons.py=                                                                                                |
+| =extension/Makefile=        | =make= (=all=) / =make chrome= / =make firefox= / =make package= / =make lint=                                                                  |
+| =extension/build/<target>/= | Generated per-target loadable directory.  Gitignored.                                                                               |
+| =spookfox/=, =emacsProtocol/= | Frozen reference material from earlier designs.  Do not modify.                                                                     |
+| =ai/=                       | Design rationale and debugging notes.                                                                                               |
 
-* The wire protocol
+* The protocol
 
 JSON text frames over a single WebSocket on =127.0.0.1:9130=.  Two shapes:
 
@@ -108,13 +108,13 @@ buffers per-client via =browsel--rx-buffers= and only parses on
 
 Top-level:
 
-| Key                 | Purpose                                                                         |
-|---------------------+---------------------------------------------------------------------------------|
-| =extension=         | Manifest fields common to every target (name, version, icons, =options_ui=).    |
-| =extensionTargets=  | Per-target overlays.  =chrome= supplies MV3 fields (=service_worker=, =action=, =scripting=/=offscreen=/=userScripts= permissions, =host_permissions=); =firefox= supplies MV2 fields (persistent =background.scripts=, =browser_action=, =browser_specific_settings.gecko=, =<all_urls>= in =permissions=). |
-| =menus=             | Right-click menu entries (each may carry a =command= hotkey).                   |
-| =handlers=          | =chrome.*= calls Emacs is allowed to invoke (Emacs → browser).                  |
-| =contentScripts=    | Declarative content scripts (matches/js/run_at).                                |
+| Key              | Purpose                                                                                                                                                                                                                                                                                |
+|------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| =extension=        | Manifest fields common to every target (name, version, icons, =options_ui=).                                                                                                                                                                                                             |
+| =extensionTargets= | Per-target overlays.  =chrome= supplies MV3 fields (=service_worker=, =action=, =scripting=/=offscreen=/=userScripts= permissions, =host_permissions=); =firefox= supplies MV2 fields (persistent =background.scripts=, =browser_action=, =browser_specific_settings.gecko=, =<all_urls>= in =permissions=). |
+| =menus=            | Right-click menu entries (each may carry a =command= hotkey).                                                                                                                                                                                                                            |
+| =handlers=         | =chrome.*= calls Emacs is allowed to invoke (Emacs → browser).                                                                                                                                                                                                                           |
+| =contentScripts=   | Declarative content scripts (matches/js/run_at).                                                                                                                                                                                                                                       |
 
 ** Menu entry
 
@@ -202,15 +202,15 @@ imports of un-listed files but not contentScripts entries themselves).
 
 ** Browser → Emacs
 
-| Name                  | Payload keys                          | Effect                                            |
-|-----------------------+---------------------------------------+---------------------------------------------------|
-| =ORG_CAPTURE=         | url, title, text, raise               | Open org-capture                                   |
-| =ORG_ROAM_CAPTURE=    | url, title, text, raise               | Open org-roam capture                              |
-| =EWW=                 | url, raise                            | Open URL in eww                                    |
-| =SAVE_PAGE=           | url, title, html                      | Save main content to =browsel-www-archive-dir= |
-| =CHATGPT=             | url, title, turns                     | Save conversation to =browsel-chatgpt-dir=    |
-| =YOUTUBE=             | url, title, text, raise               | Capture into =browsel-youtube-videos-file=    |
-| =YOUTUBE_TRANSCRIPT=  | url, title, raise                     | Save transcript to =browsel-youtube-transcript-dir= |
+| Name               | Payload keys            | Effect                                            |
+|--------------------+-------------------------+---------------------------------------------------|
+| =ORG_CAPTURE=        | url, title, text, raise | Open org-capture                                  |
+| =ORG_ROAM_CAPTURE=   | url, title, text, raise | Open org-roam capture                             |
+| =EWW=                | url, raise              | Open URL in eww                                   |
+| =SAVE_PAGE=          | url, title, html        | Save main content to =browsel-www-archive-dir=      |
+| =CHATGPT=            | url, title, turns       | Save conversation to =browsel-chatgpt-dir=          |
+| =YOUTUBE=            | url, title, text, raise | Capture into =browsel-youtube-videos-file=          |
+| =YOUTUBE_TRANSCRIPT= | url, title, raise       | Save transcript to =browsel-youtube-transcript-dir= |
 
 Capture handlers also prime three dynamic vars consumable from
 org-capture templates: =(browsel-get-url)=,
@@ -218,33 +218,33 @@ org-capture templates: =(browsel-get-url)=,
 
 ** Emacs → browser
 
-| Name                 | Args                                       | Returns                                |
-|----------------------+--------------------------------------------+----------------------------------------|
-| =GET_ALL_TABS=       | (none)                                     | array of Chrome Tab plists             |
-| =GET_ACTIVE_TAB=     | (none)                                     | array (active tabs of current window)  |
-| =OPEN_TAB=           | =:url=                                     | the created Tab                        |
-| =FOCUS_TAB=          | =:id=, optional =:focusWindow=             | ={:status "ok"}=                       |
-| =CLOSE_TAB=          | =:id=                                      | =null=                                 |
-| =EVAL_IN_ACTIVE_TAB= | =:code=, optional =:world=, =:tabId=        | =:result= = array of =InjectionResult= |
+| Name               | Args                           | Returns                               |
+|--------------------+--------------------------------+---------------------------------------|
+| =GET_ALL_TABS=       | (none)                         | array of Chrome Tab plists            |
+| =GET_ACTIVE_TAB=     | (none)                         | array (active tabs of current window) |
+| =OPEN_TAB=           | =:url=                           | the created Tab                       |
+| =FOCUS_TAB=          | =:id=, optional =:focusWindow=     | ={:status "ok"}=                        |
+| =CLOSE_TAB=          | =:id=                            | =null=                                  |
+| =EVAL_IN_ACTIVE_TAB= | =:code=, optional =:world=, =:tabId= | =:result= = array of =InjectionResult=    |
 
 =InjectionResult= is =(:documentId "..." :frameId 0 :result <value>)=.
 
 * All Emacs-side configuration variables
 
-| Variable                                             | Purpose                                                                                                  |
-|------------------------------------------------------+----------------------------------------------------------------------------------------------------------|
-| =browsel-port=                                 | WS server port (default 9130)                                                                            |
-| =browsel-host=                                 | bind address.  =local= = 127.0.0.1; =nil= = all interfaces                                                |
-| =browsel-request-timeout=                      | seconds before async req aborts (default 10)                                                              |
-| =browsel-debug=                                | when non-nil, log every WS frame to *browsel*                                                       |
-| =browsel-org-capture-key=                      | template key passed to =org-capture= for =ORG_CAPTURE=; =nil= = interactive picker                        |
-| =browsel-pandoc-executable=                    | =pandoc= binary used by save-page and chatgpt                                                            |
-| =browsel-www-archive-dir=                      | directory where save-page writes archives (set this)                                                      |
-| =browsel-chatgpt-dir=                          | directory where save-chatgpt writes conversations (set this)                                              |
-| =browsel-youtube-api-key=                      | YouTube Data API v3 key, for video metadata                                                              |
-| =browsel-youtube-videos-file=                  | org file the YouTube capture appends to (set this)                                                       |
-| =browsel-youtube-transcript-dir=               | directory where YouTube transcripts are written (set this)                                                |
-| =browsel-youtube-transcript-yt-dlp-executable= | =yt-dlp= binary used to fetch subtitles                                                                  |
+| Variable                                     | Purpose                                                                      |
+|----------------------------------------------+------------------------------------------------------------------------------|
+| =browsel-port=                                 | WS server port (default 9130)                                                |
+| =browsel-host=                                 | bind address.  =local= = 127.0.0.1; =nil= = all interfaces                       |
+| =browsel-request-timeout=                      | seconds before async req aborts (default 10)                                 |
+| =browsel-debug=                                | when non-nil, log every WS frame to *browsel*                                  |
+| =browsel-org-capture-key=                      | template key passed to =org-capture= for =ORG_CAPTURE=; =nil= = interactive picker |
+| =browsel-pandoc-executable=                    | =pandoc= binary used by save-page and chatgpt                                  |
+| =browsel-www-archive-dir=                      | directory where save-page writes archives (set this)                         |
+| =browsel-chatgpt-dir=                          | directory where save-chatgpt writes conversations (set this)                 |
+| =browsel-youtube-api-key=                      | YouTube Data API v3 key, for video metadata                                  |
+| =browsel-youtube-videos-file=                  | org file the YouTube capture appends to (set this)                           |
+| =browsel-youtube-transcript-dir=               | directory where YouTube transcripts are written (set this)                   |
+| =browsel-youtube-transcript-yt-dlp-executable= | =yt-dlp= binary used to fetch subtitles                                        |
 
 The bundled =defvar= defaults assume a particular directory layout;
 the path variables should be set explicitly per installation.
@@ -275,13 +275,13 @@ in =extension/src/handlers.js= and reference it via =args-shape=.
 
 ** Emacs-side primitives
 
-| Call                                                  | Notes                                                                                  |
-|-------------------------------------------------------+----------------------------------------------------------------------------------------|
-| =(browsel-request NAME PAYLOAD &optional CLIENT)=                | Sync.  Blocks with =accept-process-output=.  Do not call from inside a WS callback.    |
-| =(browsel-request-async NAME PAYLOAD CALLBACK &optional CLIENT)= | Async.  Returns request id.  Always safe.                                              |
-| =(browsel-register-handler NAME FN)=                             | Register a browser → Emacs handler.  Overwrites on duplicate.                          |
-| =(browsel-connected-clients)=                                    | List of currently connected client names (newest first).                               |
-| =(browsel-defer FN &rest ARGS)=                                  | Schedule FN to run on the next idle tick — for respond-fast-then-defer.                |
+| Call                                                           | Notes                                                                             |
+|----------------------------------------------------------------+-----------------------------------------------------------------------------------|
+| =(browsel-request NAME PAYLOAD &optional CLIENT)=                | Sync.  Blocks with =accept-process-output=.  Do not call from inside a WS callback. |
+| =(browsel-request-async NAME PAYLOAD CALLBACK &optional CLIENT)= | Async.  Returns request id.  Always safe.                                         |
+| =(browsel-register-handler NAME FN)=                             | Register a browser → Emacs handler.  Overwrites on duplicate.                     |
+| =(browsel-connected-clients)=                                    | List of currently connected client names (newest first).                          |
+| =(browsel-defer FN &rest ARGS)=                                  | Schedule FN to run on the next idle tick — for respond-fast-then-defer.           |
 
 * Extending the Chrome extension side
 
@@ -362,12 +362,12 @@ emacsclient -e '(format "clients=%d" (length browsel--clients))'
 
 * Debugging surfaces
 
-| Side             | Where                                                                  |
-|------------------+------------------------------------------------------------------------|
-| Emacs            | =(setq browsel-debug t)= → =*browsel*= buffer per frame    |
-| Emacs            | =*Messages*= for handler success/error                                  |
-| Chrome extension | =chrome://extensions= → Details → Inspect views: service worker        |
-| Chrome extension | =chrome://extensions= → Details → Inspect views: offscreen.html        |
+| Side             | Where                                                         |
+|------------------+---------------------------------------------------------------|
+| Emacs            | =(setq browsel-debug t)= → =*browsel*= buffer per frame           |
+| Emacs            | =*Messages*= for handler success/error                          |
+| Chrome extension | =chrome://extensions= → Details → Inspect views: service worker |
+| Chrome extension | =chrome://extensions= → Details → Inspect views: offscreen.html |
 
 For non-obvious failure modes (MV3 setIcon paths failing, IPv6
 localhost, =defvar= not overwriting, =lexical-binding= breaking

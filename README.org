@@ -5,7 +5,7 @@
 #+attr_html: :width 240 :align center
 [[file:doc/browsel-logo.png]]
 
-=browsel= is a module that allows Emacs and Chrome to
+=browsel= is a module that allows Emacs and a Web browser to
 communicate with each other, in both directions.  Right-click on a
 page in the Web browser (Chrome or Firefox) and have it sent to Emacs (org-capture, save-page,
 archive a ChatGPT conversation, save a YouTube video for later).
@@ -23,20 +23,17 @@ act on it.
    toolbar icon and the popup, and routes requests in both
    directions.  Two builds ship from the same sources: a Chrome
    Manifest V3 build and a Firefox Manifest V2 build.  Both speak
-   the same wire protocol and identify themselves to Emacs by name
+   the same protocol and identify themselves to Emacs by name
    (=chrome=, =firefox=) so a single Emacs can drive both at once.
 
-Both must be running.  The extension auto-reconnects, so restarting
-Emacs is non-disruptive — the popup transitions from Connected to
-Connecting and back.  Setup for each side is below.
+Emacs and the extension must be running.  The extension auto-reconnects, so restarting Emacs is non-disruptive.  Setup for each side is below.
 
 Security has been a major concern in the design of this module. Please see [[*Security][Security]] below
 for more information.
 
 =browsel= was inspired by [[https://github.com/bitspook/spookfox][spookfox]], a similar Emacs/Firefox
 integration.  The protocol and handler-registry pattern are adapted
-from it.  =browsel= started on Chrome and now ships a Firefox
-build as well.  Its other major enhancement is that it provides
+from it.  A major enhancement is that it provides
 two-way communication: Emacs can invoke browser handlers, and the
 browser can invoke Emacs handlers.
 
@@ -86,42 +83,45 @@ does not, click *Reconnect*.
 
 * Features
 
-** In Chrome
+** In the Web browser
 
 - Right-click menu items that trigger Emacs actions: org-capture,
   org-roam-capture, open-in-eww, save-page, save-chatgpt,
-  add-youtube-video, save-youtube-transcript.
+  add-youtube-video, save-youtube-transcript. The actions
+  can inject/execute javascript to build the request to emacs.
 - Configurable keyboard shortcuts for the same actions.
 - A toolbar popup with live connection status, per-tab permission
   controls, one-click buttons for every action, and a list of tabs
   with granted JS-eval permission (click an entry to switch to that
   tab).
-- Per-tab consent gating arbitrary JavaScript evaluation: an in-page
-  overlay prompts for permission, and the toolbar icon turns red
-  while consent remains in effect.
+- Per-tab consent before executing arbitrary JavaScript evaluation: an in-page overlay prompts for permission, and the
+  toolbar icon turns red while consent remains in effect.
 
 ** In Emacs
 
+- =M-x browsel-tab-manager-jump-to-tab= — select open tab 
+  (ordered in most-recently-used first).
 - Org-Babel =browsel-js= source blocks that run JavaScript in the
   active tab and return the value into the org buffer.
 - An elisp API to query and control the browser: list tabs, focus,
-  open, close, evaluate JS with a return value.
+  open, close, evaluate JS with a return value. See the code of
+  ~browsel-tab-manager-jump-to-tab~ to see how to use it.
 
 ** Extensibility
 
-- A new action is a single =config.json= edit plus =make build=; no
-  browser extension code change is required.
+- New actions can be added to the extension.  A new action is a single =config.json= edit plus =make build=; no browser
+  extension code change is required.
 
 * Right-click menu actions
 
-| Menu item                              | Where it shows               | What it does                                       |
-|----------------------------------------+------------------------------+----------------------------------------------------|
-| Emacs: org-capture from selection      | right-click on selected text | opens =org-capture= seeded with the selection      |
-| Emacs: org-roam-capture from selection | right-click on selected text | opens =org-roam-capture=                            |
-| Emacs: open in eww                     | any page or link             | opens the URL in =eww= inside Emacs                |
-| Emacs: save page                       | any page                     | archives the main content as an org file           |
-| Emacs: save ChatGPT conversation       | chatgpt.com pages            | saves the whole conversation as org                |
-| Emacs: add video for later             | YouTube pages / links        | appends a TODO entry with metadata to the videos file |
+| Menu item                              | Where it shows               | What it does                                                 |
+|----------------------------------------+------------------------------+--------------------------------------------------------------|
+| Emacs: org-capture from selection      | right-click on selected text | opens =org-capture= seeded with the selection                  |
+| Emacs: org-roam-capture from selection | right-click on selected text | opens =org-roam-capture=                                       |
+| Emacs: open in eww                     | any page or link             | opens the URL in =eww= inside Emacs                            |
+| Emacs: save page                       | any page                     | archives the main content as an org file                     |
+| Emacs: save ChatGPT conversation       | chatgpt.com pages            | saves the whole conversation as org                          |
+| Emacs: add video for later             | YouTube pages / links        | appends a TODO entry with metadata to the videos file        |
 | Emacs: save transcript                 | YouTube pages / links        | runs =yt-dlp= and writes an org file with clickable timestamps |
 
 * Keyboard shortcuts
@@ -152,7 +152,7 @@ a response counts as deny.
 * The popup
 
 #+caption: The browser extension popup
-#+attr_org: :width 280
+
 #+attr_html: :width 280
 [[file:doc/popup.png]]
 
@@ -166,13 +166,52 @@ a response counts as deny.
   rights, showing title, time remaining, and a *Revoke* button.
   Click a row to switch to that tab.
 
+* Querying and controlling the browser from Emacs
+
+The same =browsel-request= function used for JavaScript
+evaluation also invokes the other handlers the browser extension
+exposes.  The built-in handler names cover the operations Emacs is
+most likely to need: =GET_ALL_TABS= returns the current tab list,
+=GET_ACTIVE_TAB= returns just the focused tabs of each window,
+=OPEN_TAB= creates a new tab at a given URL, =FOCUS_TAB= switches to
+an existing tab, and =CLOSE_TAB= closes one.  Each handler's payload
+keys and response shape are documented in =CONTRIBUTING.org=.
+
+#+begin_src emacs-lisp
+;; List every open tab as title/url pairs
+(mapcar (lambda (tab) (cons (plist-get tab :title) (plist-get tab :url)))
+        (browsel-request "GET_ALL_TABS" nil))
+
+;; Switch to a tab by id (and focus its window if it is in another window)
+(browsel-request "FOCUS_TAB" '(:id 1234 :focusWindow t))
+
+;; Open a new tab
+(browsel-request "OPEN_TAB" '(:url "https://example.com"))
+#+end_src
+
+** Jump to a tab
+
+=M-x browsel-tab-manager-jump-to-tab= lists every open tab, sorted
+by =:lastAccessed= descending, and focuses the pick.  The prefix
+marks active (a), sound (s), incognito (i); space when unset.
+
+#+begin_example
+[a  ] Inbox (28) - xyz@gmail.com - Gmail — mail.google.com
+[ s ] 2026 F1 Barcelona GP race analysis - YouTube — www.youtube.com
+[  i] Search results — duckduckgo.com
+[   ] GitHub - dmgerman/browsel — github.com
+#+end_example
+
+With one browser connected it targets that one.  With two, pick the
+target with =M-x browsel-tab-manager-set-client= (=C-u= resets).
+
 * Run JavaScript in any tab from Emacs
 
 ** =browsel-request=
 
 =browsel-request= is the elisp function that sends a request to
 the browser extension and returns its response.  It is the function
-you call whenever you want Emacs to invoke a handler in the Chrome
+you call whenever you want Emacs to invoke a handler in the browser
 extension — including running JavaScript in a tab.  The call is
 synchronous: it blocks until the browser extension replies, or until
 =browsel-request-timeout= (10 seconds by default) elapses,
@@ -296,7 +335,7 @@ isolated world that can read and modify the DOM but cannot see
 page-defined globals or functions.  Pass =:world "MAIN"= when the
 block needs to read the page's own =window= state or call functions
 defined by the page; ="MAIN"= is Chrome only and a block that
-specifies it will fail on Firefox MV2.
+specifies it will fail on Firefox.
 
 *Read the current video playback time:*
 
@@ -373,53 +412,12 @@ The =:client= header is the name a browser announced via the
 automatically and =:client= may be omitted; with more than one,
 omitting =:client= signals an error and lists the connected names.
 
-* Querying and controlling the browser from Emacs
-
-The same =browsel-request= function used for JavaScript
-evaluation also invokes the other handlers the browser extension
-exposes.  The built-in handler names cover the operations Emacs is
-most likely to need: =GET_ALL_TABS= returns the current tab list,
-=GET_ACTIVE_TAB= returns just the focused tabs of each window,
-=OPEN_TAB= creates a new tab at a given URL, =FOCUS_TAB= switches to
-an existing tab, and =CLOSE_TAB= closes one.  Each handler's payload
-keys and response shape are documented in =CONTRIBUTING.org=.
-
-#+begin_src emacs-lisp
-;; List every open tab as title/url pairs
-(mapcar (lambda (tab) (cons (plist-get tab :title) (plist-get tab :url)))
-        (browsel-request "GET_ALL_TABS" nil))
-
-;; Switch to a tab by id (and focus its window if it is in another window)
-(browsel-request "FOCUS_TAB" '(:id 1234 :focusWindow t))
-
-;; Open a new tab
-(browsel-request "OPEN_TAB" '(:url "https://example.com"))
-#+end_src
-
-** Jump to a tab
-
-=M-x browsel-tab-manager-jump-to-tab= lists every open tab, sorted
-by =:lastAccessed= descending, and focuses the pick.  The prefix
-marks =a=ctive, =s=ound, =i=ncognito; space when unset.
-
-#+begin_example
-[a  ] Inbox (28) - xyz@gmail.com - Gmail — mail.google.com
-[ s ] 2026 F1 Barcelona GP race analysis - YouTube — www.youtube.com
-[  i] Search results — duckduckgo.com
-[   ] GitHub - dmgerman/browsel — github.com
-#+end_example
-
-With one browser connected it targets that one.  With two, pick the
-target with =M-x browsel-tab-manager-set-client= (=C-u= resets).
-
 * Setup
 
 ** Requirements
 
-Core (always needed):
-
 - Emacs with the =websocket= package available.
-- Chrome or Chromium.
+- Chrome / Chromium or Firefox.
 
 Per-feature.  Each row is needed *only* if you invoke that feature;
 the rest of =browsel= keeps working without it.
@@ -445,21 +443,22 @@ in the =melpa/= subdirectory of this repository).  Once accepted,
 =browsel-babel=.  Until then, clone the repository and point
 =:load-path= at it.
 
-The browser extension under =extension/= is not distributed through
-MELPA; it must be loaded into Chrome separately (see *Chrome
-extension* below).  Installing only the elisp side will start the
+The browser extension under =extension/= is not yet distributed through
+MELPA; it must be loaded into the Web browser separately (see
+*Chrome extension* or *Firefox extension* below).  Installing only
+the elisp side will start the
 WebSocket server but the popup status will remain Disconnected until
 the extension is loaded.
 
 One =use-package= form for the core, with one =require= per optional
-feature; comment out any you do not want loaded:
+feature; comment out any you do not want loaded. Change load-path
+to the correct location:
 
 #+begin_src emacs-lisp
 (use-package websocket :ensure t)
 
 (use-package browsel
-  ;; :ensure t after the MELPA recipe is accepted; until then
-  ;; :load-path "/path/to/browsel"
+  :load-path "~/.emacs.d/modules/browsel"
   :after websocket
   :config
   (require 'browsel-www)         ; SAVE_PAGE        (web archive)
@@ -469,11 +468,6 @@ feature; comment out any you do not want loaded:
   (require 'browsel-tab-manager) ; M-x browsel-tab-manager-jump-to-tab
   (browsel-start))
 #+end_src
-
-=browsel.el= itself registers the three baseline handlers
-(=ORG_CAPTURE=, =ORG_ROAM_CAPTURE=, =EWW=), which is sufficient for a
-minimal installation.  The =require= lines load the additional
-backends only when their actions are needed.
 
 The server binds =127.0.0.1:9130=.  =(browsel-stop)= /
 =(browsel-start)= start and stop it explicitly.  =(setq
@@ -511,22 +505,6 @@ In Chrome:
 The popup should turn green within a few seconds.  If not, click
 *Reconnect*.
 
-If the popup shows *Version mismatch — rebuild and reload* in red
-and a ={!}= badge appears on the toolbar icon, the extension and the
-Emacs side disagree on the browsel version.  Rebuild the
-extension (=make= in =extension/=), reload the extension card in
-=chrome://extensions=, and confirm =M-x browsel-version=
-reports the same string as the version shown at the bottom of the
-options page.  The protocol is pre-1.0 and the check is strict to
-catch silent skew before it causes confusing failures.
-
-*Optional: rebuilding after edits.*  If you customise
-=extension/config.json= or change anything under =extension/src/=,
-=extension/html/=, =extension/icons/=, or =extension/targets/chrome/=,
-run =make= from the =extension/= directory to refresh
-=extension/build/chrome/=.  Then reload the extension card in
-=chrome://extensions= to pick up the change.
-
 ** Firefox extension
 
 The built Firefox extension is included in this repository under
@@ -548,14 +526,13 @@ Temporary add-ons unload when Firefox restarts; a signed XPI build
 is on the to-do list.  The =browser_specific_settings.gecko.id= is
 already set so a signed install would have a stable identity.
 
-*What works the same as Chrome:* both browser → Emacs (right-click
-menu, popup buttons, keyboard commands, content-script relay) and
-Emacs → browser (=GET_ALL_TABS=, =OPEN_TAB=, =FOCUS_TAB=, the
-capture handlers, etc.) routing.  Each browser identifies itself via
-=CLIENT_HELLO= and Emacs targets one of several connected browsers
-through the =CLIENT= argument as described above.
+** What works the same in both extensions:
 
-*What differs:*
+Emacs (right-click menu, popup buttons, keyboard commands, content-script relay) and Emacs → browser (=GET_ALL_TABS=,
+=OPEN_TAB=, =FOCUS_TAB=, the capture handlers, etc.) routing.  Each browser identifies itself via =CLIENT_HELLO= and Emacs
+targets one of several connected browsers through the =CLIENT= argument as described above.
+
+** What differs:
 
 - =EVAL_IN_ACTIVE_TAB= and =browsel-js= source blocks run in the
   content-script isolated world.  The portable ="USER_SCRIPT"=
@@ -582,25 +559,26 @@ Larger changes (new menus, new content scripts, etc.) are made in
 
 * Security
 
-Running an unpacked Chrome extension requires *Developer mode* to be
-enabled in =chrome://extensions=.  This is a Chrome-level requirement,
-not a =browsel= feature.  With Developer mode off the extension
-does not run, no WebSocket is opened, and none of the features below
-are available.
+Running an unpacked Web browser extension requires the browser's
+developer affordance to be enabled: in Chrome, *Developer mode* in
+=chrome://extensions=; in Firefox, *Load Temporary Add-on* in
+=about:debugging=.  This is a browser-level requirement, not a
+=browsel= feature.  Without it the extension does not run, no
+WebSocket is opened, and none of the features below are available.
 
 The security posture of the running extension depends on which
 features you want to use:
 
-** Sending content from Chrome to Emacs
+** Sending content from the Web browser to Emacs
 
 The right-click menu actions, the popup buttons, and the keyboard
-shortcuts all transfer content from Chrome to Emacs at your explicit
-initiative: you click or invoke the shortcut, Chrome reads the URL,
-selection, or page HTML, and the data is sent over the WebSocket on
-=127.0.0.1:9130= to a registered handler in Emacs.  There is nothing
-to prompt for in this direction — the user is the one initiating each
-transfer.  No additional Chrome permissions need to be enabled beyond
-Developer mode.
+shortcuts all transfer content from the Web browser to Emacs at your
+explicit initiative: you click or invoke the shortcut, the browser
+reads the URL, selection, or page HTML, and the data is sent over
+the WebSocket on =127.0.0.1:9130= to a registered handler in Emacs.
+There is nothing to prompt for in this direction — the user is the
+one initiating each transfer.  No additional browser permissions
+need to be enabled beyond the developer affordance described above.
 
 ** Querying and controlling tabs from Emacs
 
@@ -610,7 +588,7 @@ between tabs, open new ones, and close existing ones.  These calls
 are not prompted: any elisp executing in your Emacs can invoke them.
 The capability is roughly equivalent to giving Emacs the ability to
 read its own buffer list — appropriate to the trust you already
-place in your editor.  No additional Chrome permissions are required.
+place in your editor.  No additional browser permissions are required.
 
 ** Evaluating JavaScript in tabs
 
