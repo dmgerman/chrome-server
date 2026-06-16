@@ -20,7 +20,7 @@
 //
 // Object kinds:
 //   { kind: "tab-message", method: "...", message: { ... }? }
-//       chrome.tabs.sendMessage(tabId, { method, ...message }) -> reply.payload
+//       api.tabs.sendMessage(tabId, { method, ...message }) -> reply.payload
 //       Generic bridge to a domain-specific content script.  The content
 //       script registers a runtime.onMessage listener and dispatches on the
 //       `method` field, then replies sendResponse({ payload: ... }).  Adding
@@ -30,9 +30,11 @@
 //
 // Each handler returns an object suitable as the WS request payload.
 
+const api = (typeof browser !== "undefined") ? browser : chrome;
+
 async function readSelectionInTab(tabId) {
   try {
-    const results = await chrome.scripting.executeScript({
+    const results = await api.scripting.executeScript({
       target: { tabId },
       func: () => window.getSelection?.().toString() ?? "",
     });
@@ -43,7 +45,7 @@ async function readSelectionInTab(tabId) {
 }
 
 async function extractMainHtml(tabId) {
-  const results = await chrome.scripting.executeScript({
+  const results = await api.scripting.executeScript({
     target: { tabId },
     func: () => {
       const el = document.querySelector("main") ||
@@ -63,10 +65,10 @@ async function extractMainHtml(tabId) {
 function callTabMethod(tabId, method, extra) {
   return new Promise((resolve, reject) => {
     const message = { method, ...(extra ?? {}) };
-    chrome.tabs.sendMessage(tabId, message, (reply) => {
-      if (chrome.runtime.lastError) {
+    api.tabs.sendMessage(tabId, message, (reply) => {
+      if (api.runtime.lastError) {
         reject(new Error(
-          `tab-message '${method}': ${chrome.runtime.lastError.message} ` +
+          `tab-message '${method}': ${api.runtime.lastError.message} ` +
           `(content script not loaded for this URL?)`
         ));
         return;

@@ -35,15 +35,17 @@ const CODE_PREVIEW_CHARS = 800;
 const CONSENT_TIMEOUT_MS = 30000;  // 30s, then treat as deny
 const ONE_HOUR_MS        = 60 * 60 * 1000;
 
+const api = (typeof browser !== "undefined") ? browser : chrome;
+
 // ── Persistence ──────────────────────────────────────────────────────────────
 
 async function loadMap() {
-  const stored = await chrome.storage.session.get([CONSENT_KEY]);
+  const stored = await api.storage.session.get([CONSENT_KEY]);
   return stored[CONSENT_KEY] ?? {};
 }
 
 async function saveMap(map) {
-  await chrome.storage.session.set({ [CONSENT_KEY]: map });
+  await api.storage.session.set({ [CONSENT_KEY]: map });
 }
 
 function isLive(entry) {
@@ -194,7 +196,7 @@ async function askConsent(tabId, fullCode) {
         : fullCode;
   let results;
   try {
-    results = await chrome.scripting.executeScript({
+    results = await api.scripting.executeScript({
       target: { tabId },
       func:   showConsentOverlay,
       args:   [preview, CONSENT_TIMEOUT_MS],

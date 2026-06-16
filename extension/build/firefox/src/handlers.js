@@ -22,6 +22,8 @@
 import { ensureConsent, tabHasConsent } from "./consent.js";
 import { evalAvailable, evalUnavailableMessage, evalInTab } from "./eval-impl.js";
 
+const api = (typeof browser !== "undefined") ? browser : chrome;
+
 // chrome.action.setIcon({path}) fails inside MV3 service workers
 // ("Failed to fetch") regardless of path correctness.  We build ImageData
 // from the bundled PNGs the same way background.js does.  Cache lives for
@@ -34,7 +36,7 @@ async function loadIconImageData(isRed) {
   const out = {};
   for (const size of ICON_SIZES) {
     const file = isRed ? `icons/icon-red-${size}.png` : `icons/icon${size}.png`;
-    const blob = await (await fetch(chrome.runtime.getURL(file))).blob();
+    const blob = await (await fetch(api.runtime.getURL(file))).blob();
     const bmp  = await createImageBitmap(blob);
     const canvas = new OffscreenCanvas(size, size);
     canvas.getContext("2d").drawImage(bmp, 0, 0, size, size);
@@ -48,7 +50,7 @@ async function syncTabIcon(tabId) {
     const granted = await tabHasConsent(tabId);
     const key = granted ? "red" : "normal";
     if (!iconCache[key]) iconCache[key] = await loadIconImageData(granted);
-    await chrome.action.setIcon({ tabId, imageData: iconCache[key] });
+    await api.action.setIcon({ tabId, imageData: iconCache[key] });
   } catch {
     // Tab may have closed; harmless.
   }
@@ -61,11 +63,11 @@ const SHAPE_ADAPTERS = {
     if (!payload || typeof payload.id !== "number") {
       throw new Error("focus-tab: payload.id (tab id) required");
     }
-    await chrome.tabs.update(payload.id, { active: true });
+    await api.tabs.update(payload.id, { active: true });
     if (payload.focusWindow) {
-      const tab = await chrome.tabs.get(payload.id);
+      const tab = await api.tabs.get(payload.id);
       if (tab.windowId !== undefined) {
-        await chrome.windows.update(tab.windowId, { focused: true });
+        await api.windows.update(tab.windowId, { focused: true });
       }
     }
     return { status: "ok" };
@@ -76,7 +78,7 @@ const SHAPE_ADAPTERS = {
     if (!payload || typeof payload.id !== "number") {
       throw new Error("tab-id: payload.id required");
     }
-    return await chrome.tabs.remove(payload.id);
+    return await api.tabs.remove(payload.id);
   },
 
   // { code: "..." } -> runtime-specific eval primitive in ./eval-impl.js.
@@ -89,7 +91,7 @@ const SHAPE_ADAPTERS = {
     }
     let tabId = payload.tabId;
     if (tabId === undefined) {
-      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      const [tab] = await api.tabs.query({ active: true, currentWindow: true });
       if (!tab) throw new Error("no active tab for user-script execution");
       tabId = tab.id;
     }
@@ -118,8 +120,11 @@ function resolveApi(path) {
   if (!path.startsWith("chrome.")) {
     throw new Error(`api path must start with 'chrome.': ${path}`);
   }
-  const parts = path.split(".");
-  let cursor = self; // service worker global; chrome lives here
+  // Config strings are written with the "chrome." prefix because that
+  // is the namespace Chrome's documentation uses; the actual lookup
+  // walks the cross-browser shim so the same path works in Firefox.
+  const parts = path.split(".").slice(1);
+  let cursor = api;
   for (const segment of parts) {
     if (cursor == null || typeof cursor !== "object") {
       throw new Error(`api path not reachable: ${path} (broke at '${segment}')`);

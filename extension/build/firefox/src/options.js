@@ -4,6 +4,8 @@
 // options.js — edit menus[] and handlers[] in chrome.storage.local,
 // plus per-action overrides for "raise Emacs?".
 
+const api = (typeof browser !== "undefined") ? browser : chrome;
+
 const menusEl    = document.getElementById("menus");
 const handlersEl = document.getElementById("handlers");
 const statusEl   = document.getElementById("status");
@@ -19,7 +21,7 @@ function format(value) {
 }
 
 async function loadBundled() {
-  const res = await fetch(chrome.runtime.getURL("config.json"));
+  const res = await fetch(api.runtime.getURL("config.json"));
   return await res.json();
 }
 
@@ -41,7 +43,7 @@ document.getElementById("save").addEventListener("click", async () => {
   try {
     const menus    = parseOrThrow(menusEl.value,    "menus");
     const handlers = parseOrThrow(handlersEl.value, "handlers");
-    await chrome.storage.local.set({ menus, handlers });
+    await api.storage.local.set({ menus, handlers });
     setStatus("Saved. Context menus rebuilt.", "ok");
   } catch (e) {
     setStatus(e.message, "error");
@@ -49,7 +51,7 @@ document.getElementById("save").addEventListener("click", async () => {
 });
 
 document.getElementById("reset").addEventListener("click", async () => {
-  await chrome.storage.local.remove(["menus", "handlers"]);
+  await api.storage.local.remove(["menus", "handlers"]);
   await loadCurrent();
   setStatus("Reset to bundled defaults.", "ok");
 });
@@ -66,7 +68,7 @@ document.getElementById("reload").addEventListener("click", () => {
 // keys fall back to the menu's bundled raise value.
 
 async function loadEffectiveMenus() {
-  const stored  = await chrome.storage.local.get(["menus"]);
+  const stored  = await api.storage.local.get(["menus"]);
   if (stored.menus) return stored.menus;
   const bundled = await loadBundled();
   return bundled.menus ?? [];
@@ -75,7 +77,7 @@ async function loadEffectiveMenus() {
 async function renderRaiseTable() {
   raiseBody.innerHTML = "";
   const menus     = await loadEffectiveMenus();
-  const stored    = await chrome.storage.local.get(["raiseOverrides"]);
+  const stored    = await api.storage.local.get(["raiseOverrides"]);
   const overrides = stored.raiseOverrides ?? {};
   for (const m of menus) {
     const tr = document.createElement("tr");
@@ -114,12 +116,12 @@ document.getElementById("save-raise").addEventListener("click", async () => {
   raiseBody.querySelectorAll("input[type=checkbox]").forEach((cb) => {
     overrides[cb.dataset.menuId] = cb.checked;
   });
-  await chrome.storage.local.set({ raiseOverrides: overrides });
+  await api.storage.local.set({ raiseOverrides: overrides });
   setStatus("Saved raise overrides.", "ok");
 });
 
 document.getElementById("reset-raise").addEventListener("click", async () => {
-  await chrome.storage.local.remove(["raiseOverrides"]);
+  await api.storage.local.remove(["raiseOverrides"]);
   await renderRaiseTable();
   setStatus("Cleared raise overrides; each menu now follows its config default.", "ok");
 });
@@ -127,7 +129,7 @@ document.getElementById("reset-raise").addEventListener("click", async () => {
 // ── Boot ────────────────────────────────────────────────────────────────────
 
 async function loadCurrent() {
-  const stored  = await chrome.storage.local.get(["menus", "handlers"]);
+  const stored  = await api.storage.local.get(["menus", "handlers"]);
   const bundled = await loadBundled();
   menusEl.value    = format(stored.menus    ?? bundled.menus);
   handlersEl.value = format(stored.handlers ?? bundled.handlers);

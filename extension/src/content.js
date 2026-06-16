@@ -14,12 +14,14 @@
 // page-side integrations keep working.  Pages should only be considered
 // allowed if they speak this protocol intentionally.
 
+const api = (typeof browser !== "undefined") ? browser : chrome;
+
 window.addEventListener("message", (event) => {
   if (event.source !== window) return;
   const data = event.data;
   if (!data || data.source !== "chrome-server") return;
   if (typeof data.name !== "string" || !data.name) return;
-  chrome.runtime.sendMessage({
+  api.runtime.sendMessage({
     target:  "service-worker",
     type:    "RELAY_TO_EMACS",
     name:    data.name,

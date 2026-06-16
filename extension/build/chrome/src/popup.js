@@ -3,6 +3,8 @@
 //
 // popup.js — connection status + config-driven action buttons.
 
+const api = (typeof browser !== "undefined") ? browser : chrome;
+
 const dot         = document.getElementById("dot");
 const statusText  = document.getElementById("status-text");
 const messageEl   = document.getElementById("message");
@@ -26,9 +28,9 @@ function setMessage(text, isError = false) {
 
 function sendToBackground(message) {
   return new Promise((resolve) => {
-    chrome.runtime.sendMessage(message, (response) => {
-      if (chrome.runtime.lastError) {
-        resolve({ ok: false, error: chrome.runtime.lastError.message });
+    api.runtime.sendMessage(message, (response) => {
+      if (api.runtime.lastError) {
+        resolve({ ok: false, error: api.runtime.lastError.message });
         return;
       }
       resolve(response ?? {});
@@ -37,7 +39,7 @@ function sendToBackground(message) {
 }
 
 async function getActiveTab() {
-  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  const [tab] = await api.tabs.query({ active: true, currentWindow: true });
   return tab;
 }
 
@@ -50,7 +52,7 @@ document.getElementById("reconnect").addEventListener("click", async () => {
   else       setMessage(`Reconnect failed: ${r?.error ?? "unknown"}`, true);
 });
 
-optionsLink.addEventListener("click", () => chrome.runtime.openOptionsPage());
+optionsLink.addEventListener("click", () => api.runtime.openOptionsPage());
 
 // ── Consent panel (this tab) ────────────────────────────────────────────────
 
@@ -180,9 +182,9 @@ async function renderConsentedTabs() {
     row.appendChild(revoke);
 
     row.addEventListener("click", async () => {
-      await chrome.tabs.update(t.tabId, { active: true });
+      await api.tabs.update(t.tabId, { active: true });
       if (typeof t.windowId === "number") {
-        try { await chrome.windows.update(t.windowId, { focused: true }); } catch {}
+        try { await api.windows.update(t.windowId, { focused: true }); } catch {}
       }
       window.close();
     });
@@ -200,10 +202,10 @@ async function renderConsentedTabs() {
 // right-click context-menu path.
 
 async function loadMenus() {
-  const stored = await chrome.storage.local.get(["menus"]);
+  const stored = await api.storage.local.get(["menus"]);
   if (stored.menus) return stored.menus;
   try {
-    const res = await fetch(chrome.runtime.getURL("config.json"));
+    const res = await fetch(api.runtime.getURL("config.json"));
     return (await res.json()).menus ?? [];
   } catch (e) {
     return [];
@@ -246,9 +248,9 @@ async function renderActions() {
 // `shortcut` means the user hasn't bound one yet.
 
 async function commandShortcutMap() {
-  if (!chrome.commands?.getAll) return {};
+  if (!api.commands?.getAll) return {};
   try {
-    const commands = await chrome.commands.getAll();
+    const commands = await api.commands.getAll();
     return Object.fromEntries(
       commands.map((c) => [c.name, c.shortcut ?? ""]),
     );
@@ -274,7 +276,7 @@ async function applyShortcutHints() {
 
 // ── Live status updates from the service worker ─────────────────────────────
 
-chrome.runtime.onMessage.addListener((msg) => {
+api.runtime.onMessage.addListener((msg) => {
   if (msg?.target !== "popup") return false;
   if (msg.type === "WS_STATUS") setStatus(msg.status);
   return false;
