@@ -74,7 +74,7 @@
 (declare-function org-roam-capture-    "org-roam"    (&rest args))
 (declare-function org-roam-node-create "org-roam"    (&rest args))
 
-(defconst browsel-version "0.88"
+(defconst browsel-version "0.90"
   "Current version of the browsel package.")
 
 ;;;###autoload

@@ -37,7 +37,8 @@
       "Bash(emacs --batch -Q -L . -L /Users/dmg/.emacs.d/arm64/31.0.90/straight/repos/emacs-websocket --eval '\\(dolist \\(f \\(list \"browsel.el\" \"browsel-www.el\" \"browsel-chatgpt.el\" \"browsel-youtube.el\" \"browsel-babel.el\"\\)\\) \\(or \\(byte-compile-file f\\) \\(kill-emacs 1\\)\\)\\)')",
       "Bash(emacs --batch -Q --eval '\\(progn \\(require \\(quote package\\)\\) \\(package-initialize\\)\\)' -L . --eval '\\(or \\(byte-compile-file \"browsel.el\"\\) \\(kill-emacs 1\\)\\)')",
       "Bash(emacs --batch -Q -L /Users/dmg/.emacs.d/arm64/31.0.90/straight/build/websocket -L . --eval '\\(or \\(byte-compile-file \"browsel.el\"\\) \\(kill-emacs 1\\)\\)')",
-      "Bash(emacs --batch -Q -L /Users/dmg/.emacs.d/arm64/31.0.90/straight/build/websocket -L . --eval '\\(or \\(byte-compile-file \"browsel-youtube.el\"\\) \\(kill-emacs 1\\)\\)')"
+      "Bash(emacs --batch -Q -L /Users/dmg/.emacs.d/arm64/31.0.90/straight/build/websocket -L . --eval '\\(or \\(byte-compile-file \"browsel-youtube.el\"\\) \\(kill-emacs 1\\)\\)')",
+      "Bash(emacs --batch -Q -L /Users/dmg/.emacs.d/arm64/31.0.90/straight/build/websocket -L . --eval '\\(or \\(byte-compile-file \"browsel-tab-manager.el\"\\) \\(kill-emacs 1\\)\\)')"
     ]
   }
 }

@@ -627,32 +627,56 @@ tab and returns."
                        (browsel-tab-manager--install-keys)
                        (browsel-tab-manager--jump-to-anchor anchor)))
            (next
+            ;; `catch' captures the non-local-exit signals from the
+            ;; in-prompt action commands (M-k / M-RET / C-t); errors
+            ;; raised inside the body go through the inner
+            ;; `condition-case' and are reported explicitly so the
+            ;; user always sees what went wrong rather than relying
+            ;; on Emacs's top-level handler.
             (catch 'browsel-tab-manager--cycle
-              (let* ((pick (minibuffer-with-setup-hook (:append setup-fn)
-                             (completing-read
-                              (format "Tab [%s] (%s): " sort client)
-                              (browsel-tab-manager--completion-table alist)
-                              nil t
-                              (and (stringp initial-input)
-                                   (not (string-empty-p initial-input))
-                                   initial-input))))
-                     ;; Some completion frontends strip text properties
-                     ;; on exit (vertico) while others preserve them;
-                     ;; look up under both.
-                     (key  (and (stringp pick) (substring-no-properties pick)))
-                     (tab  (or (cdr (assoc key  alist))
-                               (cdr (assoc pick alist)))))
-                (unless tab
-                  (user-error "browsel-tab-manager: no tab matches %S" pick))
-                (browsel-request "FOCUS_TAB"
-                                 `(:id ,(plist-get tab :id) :focusWindow t)
-                                 client)
-                nil))))
-      (when next
+              (condition-case err
+                  (let* ((pick (minibuffer-with-setup-hook (:append setup-fn)
+                                 (completing-read
+                                  (format "Tab [%s] (%s): " sort client)
+                                  (browsel-tab-manager--completion-table alist)
+                                  nil t
+                                  (and (stringp initial-input)
+                                       (not (string-empty-p initial-input))
+                                       initial-input))))
+                         ;; Some completion frontends strip text
+                         ;; properties on exit (vertico) while others
+                         ;; preserve them; look up under both.
+                         (key  (and (stringp pick)
+                                    (substring-no-properties pick)))
+                         (tab  (or (cdr (assoc key  alist))
+                                   (cdr (assoc pick alist)))))
+                    (unless tab
+                      (user-error "browsel-tab-manager: no tab matches %S"
+                                  pick))
+                    (browsel-request "FOCUS_TAB"
+                                     `(:id ,(plist-get tab :id) :focusWindow t)
+                                     client)
+                    nil)
+                (error
+                 (message "browsel-tab-manager: %s"
+                          (error-message-string err))
+                 nil)))))
+      (when (browsel-tab-manager--valid-next-p next)
         (browsel-tab-manager--run-prompt client
                                          (plist-get next :sort)
                                          (plist-get next :input)
                                          (plist-get next :anchor))))))
+
+(defun browsel-tab-manager--valid-next-p (next)
+  "Return non-nil when NEXT is a plist shaped like our throw protocol.
+Belt-and-suspenders: ensures a stray `throw' to our tag with the
+wrong payload cannot send the prompt loop recursing with junk.
+Checks that NEXT is a non-empty list whose first element is a
+keyword and that contains a `:sort' key our sort cycle recognizes."
+  (and (listp next)
+       next
+       (keywordp (car next))
+       (memq (plist-get next :sort) browsel-tab-manager--sort-cycle)))
 
 ;;;###autoload
 (defun browsel-tab-manager ()
