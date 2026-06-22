@@ -188,7 +188,9 @@ in `browsel.el' (shared with `browsel-tab-manager')."
 INCOGNITO non-nil routes via `OPEN_INCOGNITO_TAB'; if that fails
 \(typically because the extension lacks the \"Allow in incognito\"
 toggle), the function warns and falls back to a normal tab so the
-URL still reaches the user."
+URL still reaches the user.  After the tab is opened,
+`browsel-activate-client' brings the browser process to the OS
+foreground the same way the focus-existing-tab path does."
   (if (not incognito)
       (browsel-request "OPEN_TAB" (list :url url) client)
     (condition-case err
@@ -196,7 +198,8 @@ URL still reaches the user."
       (error
        (message "browsel: incognito open failed (%s); using normal tab"
                 (error-message-string err))
-       (browsel-request "OPEN_TAB" (list :url url) client)))))
+       (browsel-request "OPEN_TAB" (list :url url) client))))
+  (browsel-activate-client client))
 
 ;; ── Public command ─────────────────────────────────────────────────────────
 
