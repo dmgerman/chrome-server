@@ -76,30 +76,6 @@
 
 ;; ── Configuration ──────────────────────────────────────────────────────────
 
-(defcustom browsel-clients-needing-activation
-  '("firefox")
-  "Browsel client names whose macOS app needs an explicit foreground nudge.
-Chrome activates itself via its WebExtension API when its window
-is focused; Firefox on macOS does not, hence the fallback.  Clients
-not in this list are left alone — Chrome's main process isn't
-even the one holding the WebSocket (a helper is), so a PID-based
-activation against it would be a no-op anyway.
-
-Has no effect outside `system-type' `darwin'."
-  :type '(repeat (string :tag "browsel client"))
-  :group 'browsel)
-
-(defcustom browsel-client-app-names
-  '(("firefox" . "Firefox"))
-  "Alist mapping a browsel client name to its macOS application name.
-Fallback for clients in `browsel-clients-needing-activation' when
-the more precise PID-based lookup via `lsof' + `ps' fails to find
-the process.  The value is the application's display name as
-`open -a' expects it (e.g. \"Firefox\", \"Firefox Developer Edition\")."
-  :type '(alist :key-type   (string :tag "browsel client")
-                :value-type (string :tag "macOS .app name"))
-  :group 'browsel)
-
 (defcustom browsel-url-routes nil
   "Ordered list of URL routing rules for `browsel-browse-url'.
 
@@ -198,94 +174,14 @@ URL, INCOGNITO, and TAB-MATCH are forwarded to
 
 ;; ── Open primitives ────────────────────────────────────────────────────────
 
-(defun browsel-url-handler--lsof-client-pids ()
-  "Return the PIDs of processes connected OUT to `browsel-port'.
-A connection's client row is the one whose NAME field's remote
-endpoint is `:browsel-port'.  Filtering by the direction of the
-arrow avoids confusing the server side (Emacs) with the clients.
-Returns nil when `lsof' is unavailable or no connections exist."
-  (let* ((remote (format "->127.0.0.1:%d" browsel-port))
-         (raw    (with-temp-buffer
-                   (when (zerop (call-process "lsof" nil t nil
-                                              "-nP"
-                                              (format "-iTCP:%d" browsel-port)
-                                              "-sTCP:ESTABLISHED"))
-                     (buffer-string)))))
-    (and raw
-         (seq-filter
-          #'identity
-          (mapcar
-           (lambda (line)
-             (and (string-match-p (regexp-quote remote) line)
-                  (let ((fields (split-string line)))
-                    (and (>= (length fields) 2)
-                         (string-match-p "\\`[0-9]+\\'" (nth 1 fields))
-                         (string-to-number (nth 1 fields))))))
-           (split-string raw "\n" t))))))
-
-(defun browsel-url-handler--pid-command (pid)
-  "Return the full command line of PID via `ps', or nil on failure.
-`ps -o command=' prints the executable path plus arguments without
-truncating, which is how we tell `Google Chrome' apart from any
-other process whose `lsof' COMMAND field was clipped to 9 chars."
-  (with-temp-buffer
-    (and (zerop (call-process "ps" nil t nil
-                              "-p" (number-to-string pid)
-                              "-o" "command="))
-         (let ((s (string-trim (buffer-string))))
-           (and (not (string-empty-p s)) s)))))
-
-(defun browsel-url-handler--client-pid (client)
-  "Return the PID of the process connected to browsel as CLIENT, or nil.
-Walks every established outbound TCP connection to `browsel-port',
-asks `ps' for each candidate's full command line, and picks the
-first whose path contains CLIENT (case-insensitive substring).
-This disambiguates between multiple instances of the same browser
-\(e.g. several Firefox profiles): each instance has a distinct PID
-and only one of them holds the WebSocket to Emacs."
-  (when (eq system-type 'darwin)
-    (let ((needle (downcase client)))
-      (seq-find
-       (lambda (pid)
-         (let ((cmd (browsel-url-handler--pid-command pid)))
-           (and cmd (string-match-p (regexp-quote needle)
-                                    (downcase cmd)))))
-       (browsel-url-handler--lsof-client-pids)))))
-
-(defun browsel-url-handler--macos-activate-pid (pid)
-  "Bring the macOS process with PID to the foreground, async.
-Uses System Events because plain `open -a' would target whichever
-instance of the bundled .app macOS considers canonical, not the
-specific PID we know is holding the browsel WebSocket."
-  (call-process
-   "osascript" nil 0 nil
-   "-e"
-   (format
-    "tell application \"System Events\" to set frontmost of (first process whose unix id is %d) to true"
-    pid)))
-
 (defun browsel-url-handler--focus (tab client)
-  "Activate TAB inside CLIENT and raise its window to the foreground.
-On macOS the OS-level app activation is process-targeted: we find
-the PID of the CLIENT process via `lsof' on `browsel-port' and
-bring just that PID forward through System Events.  Disambiguates
-between multiple instances of the same browser (e.g. several
-Firefox profiles).  When the PID lookup fails (no `lsof', or no
-match), falls back to `open -a APP' using
-`browsel-client-app-names' — works for single-instance setups."
+  "Activate TAB inside CLIENT, raise its window, and nudge the macOS app.
+The OS-level app activation is delegated to `browsel-activate-client'
+in `browsel.el' (shared with `browsel-tab-manager')."
   (browsel-request "FOCUS_TAB"
                    (list :id (plist-get tab :id) :focusWindow t)
                    client)
-  (when (and (eq system-type 'darwin)
-             (member client browsel-clients-needing-activation))
-    (let ((pid (browsel-url-handler--client-pid client)))
-      (cond
-       (pid
-        (browsel-url-handler--macos-activate-pid pid))
-       (t
-        (let ((app (cdr (assoc client browsel-client-app-names))))
-          (when (and (stringp app) (not (string-empty-p app)))
-            (call-process "open" nil 0 nil "-a" app))))))))
+  (browsel-activate-client client))
 
 (defun browsel-url-handler--open-new (url client incognito)
   "Open URL in a new tab on CLIENT.

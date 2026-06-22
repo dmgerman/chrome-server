@@ -597,6 +597,7 @@ tab and returns."
                     (browsel-request "FOCUS_TAB"
                                      `(:id ,(plist-get tab :id) :focusWindow t)
                                      client)
+                    (browsel-activate-client client)
                     nil)
                 (error
                  (message "browsel-tab-manager: %s"
