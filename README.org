@@ -304,18 +304,28 @@ Each route plist accepts:
 | =:pattern=   | yes      | Regex matched anywhere in the URL (no anchors needed)            |
 | =:client=    | yes      | Client to address (=chrome= / =firefox=)                        |
 | =:incognito= | no       | When =t=, open in an incognito / private window                  |
-| =:tab-match= | no       | Override for the already-open tab detection; absent → use =:pattern= |
+| =:tab-match= | no       | Override for the already-open tab detection; absent → tab URL must contain the requested URL |
 
-When a route matches and an existing tab on that client matches the
-URL (subject to the incognito constraint), the tab is focused and its
+Routing (which client) and tab matching (which open tab) are
+separate concerns:
+
+- *Routing* uses =:pattern=.  The first matching route picks the
+  client and the incognito flag.  No match → =browsel-default-client=,
+  non-incognito.
+- *Tab matching* defaults to substring: the tab URL must contain
+  the requested URL.  A sub-page of the requested URL still counts
+  (opening =https://github.com/x/y= focuses a tab on
+  =https://github.com/x/y/issues/3=), but an unrelated page on the
+  same domain does not.  Bare-domain requests get a small
+  relaxation: the requested host (with leading =www.= stripped) is
+  the substring needle, so opening =https://amazon.ca/= still
+  reuses an open tab on =https://www.amazon.ca/dp/B1234=.  A route's
+  =:tab-match= regex overrides this default when the default isn't
+  the policy you want.
+
+When the chosen client has a matching tab, it is focused and the
 window raised.  Otherwise a fresh tab is opened — in an incognito
 window for incognito routes, in the active window otherwise.
-
-When *no* route matches, =browsel-default-client= is used,
-non-incognito, with a relaxed already-open check: any tab whose URL
-contains the requested URL's domain (with leading =www.= stripped)
-is treated as the same tab.  So =https://amazon.ca/foo= reuses an
-open tab on =https://www.amazon.ca/dp/B1234=.
 
 *Incognito caveat.*  Opening an incognito tab requires the user to
 toggle *Allow in incognito* for the browsel extension on
