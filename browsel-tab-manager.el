@@ -7,7 +7,6 @@
 ;; Maintainer: Daniel M. German <dmg@turingmachine.org>
 ;; Keywords: comm, tools, browser
 ;; URL: https://github.com/dmgerman/browsel
-;; Package-Requires: ((emacs "27.1"))
 
 ;; SPDX-License-Identifier: GPL-3.0-or-later
 ;;
@@ -641,5 +640,10 @@ In-prompt keys (see also `?' inside the prompt):
                                    browsel-tab-manager-sort))
 
 (provide 'browsel-tab-manager)
+
+
+;; Local Variables:
+;; package-lint-main-file: "browsel.el"
+;; End:
 
 ;;; browsel-tab-manager.el ends here

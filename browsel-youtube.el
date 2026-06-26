@@ -7,7 +7,6 @@
 ;; Maintainer: Daniel M. German <dmg@turingmachine.org>
 ;; Keywords: comm, tools, browser, org, multimedia
 ;; URL: https://github.com/dmgerman/browsel
-;; Package-Requires: ((emacs "27.1"))
 
 ;; SPDX-License-Identifier: GPL-3.0-or-later
 ;;
@@ -680,5 +679,10 @@ connected."
           link)))))
 
 (provide 'browsel-youtube)
+
+
+;; Local Variables:
+;; package-lint-main-file: "browsel.el"
+;; End:
 
 ;;; browsel-youtube.el ends here

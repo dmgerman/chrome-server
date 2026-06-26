@@ -7,7 +7,6 @@
 ;; Maintainer: Daniel M. German <dmg@turingmachine.org>
 ;; Keywords: comm, tools, browser, org, languages
 ;; URL: https://github.com/dmgerman/browsel
-;; Package-Requires: ((emacs "27.1") (org "9.4"))
 
 ;; SPDX-License-Identifier: GPL-3.0-or-later
 ;;
@@ -112,5 +111,10 @@ PARAMS is the alist of header arguments from the source block."
       (browsel-babel--first-result response))))
 
 (provide 'browsel-babel)
+
+
+;; Local Variables:
+;; package-lint-main-file: "browsel.el"
+;; End:
 
 ;;; browsel-babel.el ends here

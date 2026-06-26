@@ -7,7 +7,6 @@
 ;; Maintainer: Daniel M. German <dmg@turingmachine.org>
 ;; Keywords: comm, tools, browser, org
 ;; URL: https://github.com/dmgerman/browsel
-;; Package-Requires: ((emacs "27.1"))
 
 ;; SPDX-License-Identifier: GPL-3.0-or-later
 ;;
@@ -149,5 +148,10 @@ Signals an error if pandoc is not found or exits non-zero."
 (browsel-register-handler "SAVE_PAGE" #'browsel-www--handle-save-page)
 
 (provide 'browsel-www)
+
+
+;; Local Variables:
+;; package-lint-main-file: "browsel.el"
+;; End:
 
 ;;; browsel-www.el ends here

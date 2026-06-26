@@ -7,7 +7,6 @@
 ;; Maintainer: Daniel M. German <dmg@turingmachine.org>
 ;; Keywords: comm, tools, browser, org
 ;; URL: https://github.com/dmgerman/browsel
-;; Package-Requires: ((emacs "27.1"))
 
 ;; SPDX-License-Identifier: GPL-3.0-or-later
 ;;
@@ -238,5 +237,10 @@ plus any extracted images.  Returns the path of the org file written."
 (browsel-register-handler "CHATGPT" #'browsel-chatgpt--handle-chatgpt)
 
 (provide 'browsel-chatgpt)
+
+
+;; Local Variables:
+;; package-lint-main-file: "browsel.el"
+;; End:
 
 ;;; browsel-chatgpt.el ends here

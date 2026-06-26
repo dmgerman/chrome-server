@@ -7,7 +7,6 @@
 ;; Maintainer: Daniel M. German <dmg@turingmachine.org>
 ;; Keywords: comm, tools, browser
 ;; URL: https://github.com/dmgerman/browsel
-;; Package-Requires: ((emacs "27.1"))
 
 ;; SPDX-License-Identifier: GPL-3.0-or-later
 ;;
@@ -307,5 +306,10 @@ accepted and ignored."
           (browsel-url-handler--open-new url client incognito)))))))
 
 (provide 'browsel-url-handler)
+
+
+;; Local Variables:
+;; package-lint-main-file: "browsel.el"
+;; End:
 
 ;;; browsel-url-handler.el ends here
