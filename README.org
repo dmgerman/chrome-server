@@ -30,7 +30,7 @@ act on it.
 
 I have created a video to introduce its features:
 
-[[https://www.youtube.com/watch?v=8nSiG\_hMZWI]]
+[[https://www.youtube.com/watch?v=8nSiG_hMZWI]]
      
 =browsel= is composed of two parts:
 
